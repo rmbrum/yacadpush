@@ -1,0 +1,36 @@
+Academic Publications Showcase - WordPress Plugin
+Copyright (C) 2020 DARIAH-ERIC (original "Display Your Zenodo Community" plugin)
+Copyright (C) 2026 Martin Haváček (modifications and enhancements)
+
+Developed as part of the project "Research of Excellence on Digital Technologies and Wellbeing"
+Project Registration Number: CZ.02.01.01/00/22_008/0004583
+Operational Program: The Johannes Amos Comenius
+Co-funded by the European Union
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+---
+
+ADDITIONAL INFORMATION:
+
+This plugin is based on "Display Your Zenodo Community" originally developed
+by DARIAH-EU and licensed under Apache License 2.0. This derivative work has
+been relicensed under GNU General Public License v2 or later, which is
+compatible with the original Apache 2.0 license.
+
+Original plugin: https://wordpress.org/plugins/display-your-zenodo-community/
+Original author: Yoann Moranville (DARIAH-EU)
+
+For the full text of the GNU General Public License v2, visit:
+https://www.gnu.org/licenses/gpl-2.0.html
