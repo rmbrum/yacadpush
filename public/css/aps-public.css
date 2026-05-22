@@ -211,3 +211,14 @@
 		width: 100%;
 	}
 }
+
+/* Botão PDF — fonte: banco de dados próprio */
+.dyzc-btn-pdf {
+    background-color: #c0392b;
+    color: #fff !important;
+    border: 1px solid #a93226;
+}
+.dyzc-btn-pdf:hover {
+    background-color: #a93226;
+    color: #fff !important;
+}

@@ -180,43 +180,57 @@ class ACADPUSH_Admin {
 	public function validate( $input ) {
 		$valid = array();
 
-		// API Settings
-		$valid['id_community_orcid'] = isset( $input['id_community_orcid'] ) ? sanitize_text_field( $input['id_community_orcid'] ) : '';
-		$valid['choice'] = isset( $input['choice'] ) ? sanitize_text_field( $input['choice'] ) : 'community';
-		$valid['access_token'] = isset( $input['access_token'] ) ? sanitize_text_field( $input['access_token'] ) : '';
-		$valid['orcid_id'] = isset( $input['orcid_id'] ) ? sanitize_text_field( $input['orcid_id'] ) : '';
-		$valid['extra_keyword'] = isset( $input['extra_keyword'] ) ? sanitize_text_field( $input['extra_keyword'] ) : '';
-		$valid['number_publications'] = isset( $input['number_publications'] ) ? absint( $input['number_publications'] ) : 10;
+		// Fonte de dados
+		$allowed_choices = array( 'community', 'orcid', 'database' );
+		$valid['choice'] = isset( $input['choice'] ) && in_array( $input['choice'], $allowed_choices, true )
+			? $input['choice'] : 'community';
+
+		// API Settings (Zenodo)
+		$valid['id_community_orcid']    = isset( $input['id_community_orcid'] )    ? sanitize_text_field( $input['id_community_orcid'] )    : '';
+		$valid['access_token']          = isset( $input['access_token'] )          ? sanitize_text_field( $input['access_token'] )          : '';
+		$valid['orcid_id']              = isset( $input['orcid_id'] )              ? sanitize_text_field( $input['orcid_id'] )              : '';
+		$valid['extra_keyword']         = isset( $input['extra_keyword'] )         ? sanitize_text_field( $input['extra_keyword'] )         : '';
+		$valid['number_publications']   = isset( $input['number_publications'] )   ? absint( $input['number_publications'] )               : 10;
 		$valid['filter_categories_raw'] = isset( $input['filter_categories_raw'] ) ? sanitize_text_field( $input['filter_categories_raw'] ) : '';
 
-		// Design Settings - with fail-safe for invalid colors
-		$primary = isset( $input['primary_color'] ) ? sanitize_hex_color( $input['primary_color'] ) : false;
+		// Database Settings
+		$valid['db_host']     = isset( $input['db_host'] )     ? sanitize_text_field( $input['db_host'] )     : 'localhost';
+		$valid['db_port']     = isset( $input['db_port'] )     ? absint( $input['db_port'] )                  : 3306;
+		$valid['db_name']     = isset( $input['db_name'] )     ? sanitize_text_field( $input['db_name'] )     : '';
+		$valid['db_user']     = isset( $input['db_user'] )     ? sanitize_text_field( $input['db_user'] )     : '';
+		// Senha: preserva valor anterior se o campo vier vazio (não sobrescreve)
+		$existing             = get_option( $this->plugin_name, array() );
+		$valid['db_password'] = ( isset( $input['db_password'] ) && $input['db_password'] !== '' )
+			? $input['db_password']
+			: ( isset( $existing['db_password'] ) ? $existing['db_password'] : '' );
+
+		// Design Settings
+		$primary     = isset( $input['primary_color'] )      ? sanitize_hex_color( $input['primary_color'] )      : false;
 		$valid['primary_color'] = $primary ?: '#2271b1';
 
-		$card_bg = isset( $input['card_bg_color'] ) ? sanitize_hex_color( $input['card_bg_color'] ) : false;
+		$card_bg     = isset( $input['card_bg_color'] )      ? sanitize_hex_color( $input['card_bg_color'] )      : false;
 		$valid['card_bg_color'] = $card_bg ?: '#ffffff';
 
-		$card_border = isset( $input['card_border_color'] ) ? sanitize_hex_color( $input['card_border_color'] ) : false;
+		$card_border = isset( $input['card_border_color'] )  ? sanitize_hex_color( $input['card_border_color'] )  : false;
 		$valid['card_border_color'] = $card_border ?: '#dcdcde';
 
-		$text = isset( $input['text_color'] ) ? sanitize_hex_color( $input['text_color'] ) : false;
+		$text        = isset( $input['text_color'] )         ? sanitize_hex_color( $input['text_color'] )         : false;
 		$valid['text_color'] = $text ?: '#1d2327';
 
-		$meta = isset( $input['meta_text_color'] ) ? sanitize_hex_color( $input['meta_text_color'] ) : false;
+		$meta        = isset( $input['meta_text_color'] )    ? sanitize_hex_color( $input['meta_text_color'] )    : false;
 		$valid['meta_text_color'] = $meta ?: '#646970';
 
-		// Typography & Layout
-		$allowed_fonts = array( 'system', 'Inter', 'Roboto', 'Open Sans', 'Merriweather' );
-		$valid['font_family'] = isset( $input['font_family'] ) && in_array( $input['font_family'], $allowed_fonts, true ) ? $input['font_family'] : 'system';
+		$allowed_fonts   = array( 'system', 'Inter', 'Roboto', 'Open Sans', 'Merriweather' );
+		$valid['font_family']    = isset( $input['font_family'] ) && in_array( $input['font_family'], $allowed_fonts, true )    ? $input['font_family']    : 'system';
 
-		$allowed_sizes = array( 'small', 'medium', 'large' );
-		$valid['font_size'] = isset( $input['font_size'] ) && in_array( $input['font_size'], $allowed_sizes, true ) ? $input['font_size'] : 'medium';
+		$allowed_sizes   = array( 'small', 'medium', 'large' );
+		$valid['font_size']      = isset( $input['font_size'] )   && in_array( $input['font_size'],   $allowed_sizes, true )    ? $input['font_size']      : 'medium';
 
 		$allowed_layouts = array( 'standard', 'compact', 'detailed' );
-		$valid['card_layout'] = isset( $input['card_layout'] ) && in_array( $input['card_layout'], $allowed_layouts, true ) ? $input['card_layout'] : 'standard';
+		$valid['card_layout']    = isset( $input['card_layout'] ) && in_array( $input['card_layout'], $allowed_layouts, true )  ? $input['card_layout']    : 'standard';
 
-		$allowed_radius = array( 'none', 'small', 'medium', 'large' );
-		$valid['border_radius'] = isset( $input['border_radius'] ) && in_array( $input['border_radius'], $allowed_radius, true ) ? $input['border_radius'] : 'medium';
+		$allowed_radius  = array( 'none', 'small', 'medium', 'large' );
+		$valid['border_radius']  = isset( $input['border_radius'] ) && in_array( $input['border_radius'], $allowed_radius, true ) ? $input['border_radius'] : 'medium';
 
 		return $valid;
 	}

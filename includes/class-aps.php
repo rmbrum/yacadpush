@@ -74,6 +74,7 @@ class ACADPUSH {
 	private function load_dependencies() {
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-aps-loader.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-aps-i18n.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-aps-db.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-aps-admin.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-aps-public.php';
 		$this->loader = new ACADPUSH_Loader();

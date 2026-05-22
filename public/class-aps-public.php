@@ -255,7 +255,14 @@ class ACADPUSH_Public {
 				$html .= '</a>';
 			}
 
-			// Zenodo link
+			// PDF direto (fonte: banco próprio via ieee_pdf_url, ou Zenodo quando disponível)
+			if (!empty($hit->links->pdf)) {
+				$html .= '<a href="' . esc_url($hit->links->pdf) . '" class="dyzc-btn dyzc-btn-pdf" target="_blank" rel="noopener">';
+				$html .= esc_html( $this->get_label('view_pdf', $lang) );
+				$html .= '</a>';
+			}
+
+			// Zenodo / repositório link
 			if (!empty($hit->links->self_html) || !empty($hit->links->latest_html)) {
 				$zenodo_url = !empty($hit->links->self_html) ? $hit->links->self_html : $hit->links->latest_html;
 				$html .= '<a href="' . esc_url($zenodo_url) . '" class="dyzc-btn dyzc-btn-secondary" target="_blank" rel="noopener">';
@@ -274,17 +281,46 @@ class ACADPUSH_Public {
 	}
 
 	private function zp_retrieve_json($page, $options, $keyword_override, $type_filter = '', $subtype_filter = '') {
-		$choice = isset($options['choice']) ? $options['choice'] : 'community';
-		$id = isset($options['id_community_orcid']) ? trim($options['id_community_orcid']) : '';
-		$access_token = isset($options['access_token']) ? trim($options['access_token']) : '';
+		$choice        = isset($options['choice']) ? $options['choice'] : 'community';
 		$extra_keyword = isset($options['extra_keyword']) ? trim($options['extra_keyword']) : '';
-		$size = isset($options['number_publications']) ? max(1, min(100, (int)$options['number_publications'])) : 10;
+		$size          = isset($options['number_publications']) ? max(1, min(100, (int)$options['number_publications'])) : 10;
+		$final_keyword = !empty($keyword_override) ? $keyword_override : $extra_keyword;
+
+		// -----------------------------------------------------------------------
+		// FONTE: banco de dados próprio
+		// -----------------------------------------------------------------------
+		if ( $choice === 'database' ) {
+			$transient_key = 'acadpush_db_' . md5( $final_keyword . $type_filter . $subtype_filter . $page . $size );
+			$cached = get_transient( $transient_key );
+			if ( $cached !== false ) {
+				return $cached;
+			}
+
+			$db = new ACADPUSH_DB();
+			if ( ! $db->connect( $options ) ) {
+				return new WP_Error( 'db_connect', $db->connect_error );
+			}
+
+			$data = $db->query_publications( $page, $size, $final_keyword, $type_filter, $subtype_filter );
+			$db->close();
+
+			if ( is_wp_error( $data ) ) {
+				return $data;
+			}
+
+			set_transient( $transient_key, $data, HOUR_IN_SECONDS );
+			return $data;
+		}
+
+		// -----------------------------------------------------------------------
+		// FONTE: Zenodo (community ou orcid) — comportamento original
+		// -----------------------------------------------------------------------
+		$id           = isset($options['id_community_orcid']) ? trim($options['id_community_orcid']) : '';
+		$access_token = isset($options['access_token']) ? trim($options['access_token']) : '';
 
 		if (empty($id)) {
 			return new WP_Error('no_id', 'No Community ID or ORCID configured.');
 		}
-
-		$final_keyword = !empty($keyword_override) ? $keyword_override : $extra_keyword;
 
 		$transient_key = 'acadpush_' . md5($choice . $id . $final_keyword . $type_filter . $subtype_filter . $page . $size);
 		$cached = get_transient($transient_key);
@@ -297,48 +333,27 @@ class ACADPUSH_Public {
 			if (!empty($final_keyword)) {
 				$query .= ' AND ' . $final_keyword;
 			}
-
 			$url = 'https://zenodo.org/api/records/?q=' . rawurlencode($query) . '&size=' . $size . '&page=' . $page . '&sort=newest';
-
-			// Add type and subtype as dedicated URL parameters
-			if (!empty($type_filter)) {
-				$url .= '&type=' . rawurlencode($type_filter);
-			}
-			if (!empty($subtype_filter)) {
-				$url .= '&subtype=' . rawurlencode($subtype_filter);
-			}
+			if (!empty($type_filter))    { $url .= '&type='    . rawurlencode($type_filter); }
+			if (!empty($subtype_filter)) { $url .= '&subtype=' . rawurlencode($subtype_filter); }
 		} else {
 			$url = 'https://zenodo.org/api/records/?communities=' . rawurlencode($id) . '&size=' . $size . '&page=' . $page . '&sort=newest';
-
-			// Add keyword as q parameter if present
-			if (!empty($final_keyword)) {
-				$url .= '&q=' . rawurlencode($final_keyword);
-			}
-
-			// Add type and subtype as dedicated URL parameters
-			if (!empty($type_filter)) {
-				$url .= '&type=' . rawurlencode($type_filter);
-			}
-			if (!empty($subtype_filter)) {
-				$url .= '&subtype=' . rawurlencode($subtype_filter);
-			}
+			if (!empty($final_keyword))  { $url .= '&q='       . rawurlencode($final_keyword); }
+			if (!empty($type_filter))    { $url .= '&type='    . rawurlencode($type_filter); }
+			if (!empty($subtype_filter)) { $url .= '&subtype=' . rawurlencode($subtype_filter); }
 		}
 
 		$args = array(
-			'timeout' => 30,
+			'timeout'    => 30,
 			'user-agent' => 'Academic Publications Showcase/' . $this->version . ' (WordPress Plugin)',
-			'headers' => array('Accept' => 'application/json'),
+			'headers'    => array('Accept' => 'application/json'),
 		);
-
 		if (!empty($access_token)) {
 			$args['headers']['Authorization'] = 'Bearer ' . $access_token;
 		}
 
 		$response = wp_remote_get($url, $args);
-
-		if (is_wp_error($response)) {
-			return $response;
-		}
+		if (is_wp_error($response)) { return $response; }
 
 		$status_code = wp_remote_retrieve_response_code($response);
 		if ($status_code !== 200) {
@@ -347,7 +362,6 @@ class ACADPUSH_Public {
 
 		$body = wp_remote_retrieve_body($response);
 		$data = json_decode($body);
-
 		if (json_last_error() !== JSON_ERROR_NONE) {
 			return new WP_Error('json_error', 'Invalid JSON response');
 		}
@@ -388,22 +402,24 @@ class ACADPUSH_Public {
 	private function get_label($key, $lang) {
 		$labels = array(
 			'cs' => array(
-				'no_results' => 'Žádné publikace nenalezeny.',
+				'no_results'       => 'Žádné publikace nenalezeny.',
 				'view_publication' => 'Publikace',
-				'view_repository' => 'Repozitář',
-				'show_more' => 'Zobrazit více',
-				'show_less' => 'Zobrazit méně',
-				'previous' => 'Předchozí',
-				'next' => 'Další',
+				'view_pdf'         => 'PDF',
+				'view_repository'  => 'Repozitář',
+				'show_more'        => 'Zobrazit více',
+				'show_less'        => 'Zobrazit méně',
+				'previous'         => 'Předchozí',
+				'next'             => 'Další',
 			),
 			'en' => array(
-				'no_results' => 'No publications found.',
+				'no_results'       => 'No publications found.',
 				'view_publication' => 'Publication',
-				'view_repository' => 'Repository',
-				'show_more' => 'Show more',
-				'show_less' => 'Show less',
-				'previous' => 'Previous',
-				'next' => 'Next',
+				'view_pdf'         => 'PDF',
+				'view_repository'  => 'Repository',
+				'show_more'        => 'Show more',
+				'show_less'        => 'Show less',
+				'previous'         => 'Previous',
+				'next'             => 'Next',
 			),
 		);
 

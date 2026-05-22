@@ -24,6 +24,12 @@ $acadpush_extra_keyword = isset( $acadpush_options['extra_keyword'] ) ? $acadpus
 $acadpush_number_publications = isset( $acadpush_options['number_publications'] ) ? $acadpush_options['number_publications'] : 10;
 $acadpush_filter_categories_raw = isset( $acadpush_options['filter_categories_raw'] ) ? $acadpush_options['filter_categories_raw'] : '';
 
+// Database options
+$acadpush_db_host     = isset( $acadpush_options['db_host'] )     ? $acadpush_options['db_host']     : 'localhost';
+$acadpush_db_port     = isset( $acadpush_options['db_port'] )     ? $acadpush_options['db_port']     : 3306;
+$acadpush_db_name     = isset( $acadpush_options['db_name'] )     ? $acadpush_options['db_name']     : '';
+$acadpush_db_user     = isset( $acadpush_options['db_user'] )     ? $acadpush_options['db_user']     : '';
+
 // Design options
 $acadpush_primary_color = isset( $acadpush_options['primary_color'] ) ? $acadpush_options['primary_color'] : '#2271b1';
 $acadpush_card_bg_color = isset( $acadpush_options['card_bg_color'] ) ? $acadpush_options['card_bg_color'] : '#ffffff';
@@ -36,7 +42,7 @@ $acadpush_card_layout = isset( $acadpush_options['card_layout'] ) ? $acadpush_op
 $acadpush_border_radius = isset( $acadpush_options['border_radius'] ) ? $acadpush_options['border_radius'] : 'medium';
 
 // Validate tab parameter against allowlist
-$acadpush_allowed_tabs = array( 'api', 'design', 'usage' );
+$acadpush_allowed_tabs = array( 'api', 'database', 'design', 'usage' );
 $acadpush_raw_tab = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'api'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab navigation, no state change
 $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true ) ? $acadpush_raw_tab : 'api';
 ?>
@@ -48,6 +54,10 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 		<a href="?page=<?php echo esc_attr( $this->plugin_name ); ?>&tab=api"
 		   class="nav-tab <?php echo esc_attr( $acadpush_active_tab === 'api' ? 'nav-tab-active' : '' ); ?>">
 			API Settings
+		</a>
+		<a href="?page=<?php echo esc_attr( $this->plugin_name ); ?>&tab=database"
+		   class="nav-tab <?php echo esc_attr( $acadpush_active_tab === 'database' ? 'nav-tab-active' : '' ); ?>">
+			Local Database
 		</a>
 		<a href="?page=<?php echo esc_attr( $this->plugin_name ); ?>&tab=design"
 		   class="nav-tab <?php echo esc_attr( $acadpush_active_tab === 'design' ? 'nav-tab-active' : '' ); ?>">
@@ -69,23 +79,25 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 				?>
 
 				<div class="dyzc-section">
-					<h3>Zenodo API Configuration</h3>
+					<h3>Data Source &amp; Zenodo API Configuration</h3>
 					<table class="form-table">
 						<tbody>
 							<tr>
 								<th scope="row">
 									<label for="<?php echo esc_attr( $this->plugin_name ); ?>-choice">
-										Mode
+										Data Source
 									</label>
 								</th>
 								<td>
 									<select name="<?php echo esc_attr( $this->plugin_name ); ?>[choice]"
 									        id="<?php echo esc_attr( $this->plugin_name ); ?>-choice">
-										<option value="community" <?php selected( $acadpush_choice, 'community' ); ?>>Community</option>
-										<option value="orcid" <?php selected( $acadpush_choice, 'orcid' ); ?>>ORCID</option>
+										<option value="community" <?php selected( $acadpush_choice, 'community' ); ?>>Community (Zenodo API)</option>
+										<option value="orcid"     <?php selected( $acadpush_choice, 'orcid' ); ?>>ORCID (Zenodo API)</option>
+										<option value="database"  <?php selected( $acadpush_choice, 'database' ); ?>>Local Database (MySQL)</option>
 									</select>
 									<span class="dyzc-help-text">
-										Choose whether to display publications from a Zenodo community or an ORCID author profile.
+										<strong>Community / ORCID:</strong> busca dados diretamente na API do Zenodo.<br>
+										<strong>Local Database:</strong> usa banco MySQL próprio alimentado por <code>json_to_db.py</code>. Configure as credenciais na aba <em>Local Database</em>.
 									</span>
 								</td>
 							</tr>
@@ -172,6 +184,87 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 				<?php submit_button( 'Save API Settings', 'primary', 'submit', true ); ?>
 			</form>
 
+		<?php elseif ( $acadpush_active_tab === 'database' ) : ?>
+			<!-- Local Database Tab -->
+			<form method="post" name="<?php echo esc_attr( $this->plugin_name ); ?>_options" action="options.php">
+				<?php
+				settings_fields( $this->plugin_name );
+				do_settings_sections( $this->plugin_name );
+				?>
+
+				<!-- Hidden fields para preservar configurações das outras abas -->
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[choice]" value="<?php echo esc_attr( $acadpush_choice ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[id_community_orcid]" value="<?php echo esc_attr( $acadpush_id_community_orcid ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[access_token]" value="<?php echo esc_attr( $acadpush_access_token ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[orcid_id]" value="<?php echo esc_attr( $acadpush_orcid_id ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[extra_keyword]" value="<?php echo esc_attr( $acadpush_extra_keyword ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[number_publications]" value="<?php echo esc_attr( $acadpush_number_publications ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[filter_categories_raw]" value="<?php echo esc_attr( $acadpush_filter_categories_raw ); ?>">
+
+				<div class="dyzc-section">
+					<h3>MySQL Database Credentials</h3>
+					<p>Configure the connection to the MySQL database populated by <code>json_to_db.py</code>. Only used when <strong>Data Source</strong> is set to <em>Local Database</em>.</p>
+					<table class="form-table">
+						<tbody>
+							<tr>
+								<th scope="row"><label for="<?php echo esc_attr( $this->plugin_name ); ?>-db-host">Host</label></th>
+								<td>
+									<input type="text"
+									       name="<?php echo esc_attr( $this->plugin_name ); ?>[db_host]"
+									       id="<?php echo esc_attr( $this->plugin_name ); ?>-db-host"
+									       value="<?php echo esc_attr( $acadpush_db_host ); ?>"
+									       placeholder="localhost">
+								</td>
+							</tr>
+							<tr>
+								<th scope="row"><label for="<?php echo esc_attr( $this->plugin_name ); ?>-db-port">Port</label></th>
+								<td>
+									<input type="number"
+									       name="<?php echo esc_attr( $this->plugin_name ); ?>[db_port]"
+									       id="<?php echo esc_attr( $this->plugin_name ); ?>-db-port"
+									       value="<?php echo esc_attr( $acadpush_db_port ); ?>"
+									       min="1" max="65535" style="width:100px;">
+								</td>
+							</tr>
+							<tr>
+								<th scope="row"><label for="<?php echo esc_attr( $this->plugin_name ); ?>-db-name">Database Name</label></th>
+								<td>
+									<input type="text"
+									       name="<?php echo esc_attr( $this->plugin_name ); ?>[db_name]"
+									       id="<?php echo esc_attr( $this->plugin_name ); ?>-db-name"
+									       value="<?php echo esc_attr( $acadpush_db_name ); ?>"
+									       placeholder="publications_db">
+								</td>
+							</tr>
+							<tr>
+								<th scope="row"><label for="<?php echo esc_attr( $this->plugin_name ); ?>-db-user">User</label></th>
+								<td>
+									<input type="text"
+									       name="<?php echo esc_attr( $this->plugin_name ); ?>[db_user]"
+									       id="<?php echo esc_attr( $this->plugin_name ); ?>-db-user"
+									       value="<?php echo esc_attr( $acadpush_db_user ); ?>"
+									       autocomplete="off">
+								</td>
+							</tr>
+							<tr>
+								<th scope="row"><label for="<?php echo esc_attr( $this->plugin_name ); ?>-db-password">Password</label></th>
+								<td>
+									<input type="password"
+									       name="<?php echo esc_attr( $this->plugin_name ); ?>[db_password]"
+									       id="<?php echo esc_attr( $this->plugin_name ); ?>-db-password"
+									       value=""
+									       placeholder="<?php echo ! empty( $acadpush_options['db_password'] ) ? '••••••••' : ''; ?>"
+									       autocomplete="new-password">
+									<span class="dyzc-help-text">Deixe em branco para manter a senha atual.</span>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+
+				<?php submit_button( 'Save Database Settings', 'primary', 'submit', true ); ?>
+			</form>
+
 		<?php elseif ( $acadpush_active_tab === 'design' ) : ?>
 			<!-- Design Tab -->
 			<form method="post" name="<?php echo esc_attr( $this->plugin_name ); ?>_options" action="options.php">
@@ -188,6 +281,11 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[extra_keyword]" value="<?php echo esc_attr( $acadpush_extra_keyword ); ?>">
 				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[number_publications]" value="<?php echo esc_attr( $acadpush_number_publications ); ?>">
 				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[filter_categories_raw]" value="<?php echo esc_attr( $acadpush_filter_categories_raw ); ?>">
+				<!-- Hidden fields to preserve database settings -->
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[db_host]" value="<?php echo esc_attr( $acadpush_db_host ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[db_port]" value="<?php echo esc_attr( $acadpush_db_port ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[db_name]" value="<?php echo esc_attr( $acadpush_db_name ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $this->plugin_name ); ?>[db_user]" value="<?php echo esc_attr( $acadpush_db_user ); ?>">
 
 				<div class="dyzc-section">
 					<h3>Color Scheme</h3>
