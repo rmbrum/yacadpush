@@ -1,0 +1,74 @@
+{
+  "_comment": "SYNTHETIC test fixture. DOIs, authors and titles are invented. Do not upload to Zenodo.",
+  "format_version": "1.0",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "total": 2,
+  "entries": [
+    {
+      "doi": "10.0000/yacadpush.sample.0001",
+      "collected_at": "2026-01-01T00:00:00Z",
+      "ieee_raw": {},
+      "crossref_raw": {},
+      "zenodo_metadata": {
+        "upload_type": "article",
+        "title": "A Synthetic Journal Article for Testing the YACADPUSH Pipeline",
+        "description": "Synthetic abstract used only to exercise the loader and the plugin rendering code.",
+        "creators": [
+          {"name": "Silva, Ana", "affiliation": "Example University", "orcid": "0000-0000-0000-0001"},
+          {"name": "Souza, Bruno", "affiliation": "Example Institute"}
+        ],
+        "publication_date": "2025",
+        "access_right": "open",
+        "keywords": ["testing", "wordpress", "zenodo"],
+        "doi": "10.0000/yacadpush.sample.0001",
+        "journal_title": "Journal of Synthetic Results",
+        "journal_volume": "12",
+        "journal_issue": "3",
+        "journal_pages": "100-110",
+        "publisher": "Example Publisher",
+        "related_identifiers": [
+          {"identifier": "https://doi.org/10.0000/yacadpush.sample.0001", "relation": "isIdenticalTo"},
+          {"identifier": "https://ieeexplore.ieee.org/document/0000001", "relation": "isAlternateIdentifier", "resource_type": "publication-article"},
+          {"identifier": "https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=0000001", "relation": "isIdenticalTo", "resource_type": "publication-article"}
+        ],
+        "communities": [{"identifier": "example-community"}],
+        "license": "cc-by-4.0"
+      },
+      "status": "pending",
+      "zenodo_deposit_id": null,
+      "zenodo_deposit_url": null,
+      "zenodo_doi": null,
+      "error": null
+    },
+    {
+      "doi": "10.0000/yacadpush.sample.0002",
+      "collected_at": "2026-01-01T00:00:00Z",
+      "ieee_raw": {},
+      "crossref_raw": {},
+      "zenodo_metadata": {
+        "upload_type": "conferencepaper",
+        "title": "A Synthetic Conference Paper on Local Database Backends",
+        "description": "Second synthetic entry, of conference type, to test type filtering.",
+        "creators": [
+          {"name": "Lima, Carla", "affiliation": "Example University", "orcid": "0000-0000-0000-0002"}
+        ],
+        "publication_date": "2024-06-15",
+        "access_right": "open",
+        "keywords": ["testing", "mysql"],
+        "doi": "10.0000/yacadpush.sample.0002",
+        "conference_title": "Proc. Synthetic Conference 2024",
+        "conference_place": "Porto Alegre, Brazil",
+        "conference_dates": "15-17 June 2024",
+        "related_identifiers": [
+          {"identifier": "https://doi.org/10.0000/yacadpush.sample.0002", "relation": "isIdenticalTo"}
+        ],
+        "license": "cc-by-4.0"
+      },
+      "status": "pending",
+      "zenodo_deposit_id": null,
+      "zenodo_deposit_url": null,
+      "zenodo_doi": null,
+      "error": null
+    }
+  ]
+}

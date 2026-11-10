@@ -1,0 +1,7 @@
+.env
+tools/.env
+__pycache__/
+*.pyc
+.venv/
+# Generated pipeline outputs (keep tools/sample/ fixtures)
+tools/output/
