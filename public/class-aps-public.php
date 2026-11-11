@@ -112,9 +112,15 @@ class ACADPUSH_Public {
 			'subtype' => ''    // Specific subtype: article, book, conferencepaper, etc.
 		), $attr, 'showcase-publications' );
 
-		$lang = (strpos(strtolower(get_locale()), 'cs') === 0) ? 'cs' : 'en';
+		$locale = strtolower( get_locale() );
+		$lang   = 'en';
+		if ( strpos( $locale, 'cs' ) === 0 ) {
+			$lang = 'cs';
+		} elseif ( strpos( $locale, 'pt' ) === 0 ) {
+			$lang = 'pt';
+		}
 
-		$allowed_langs = array( 'cs', 'en' );
+		$allowed_langs = array( 'cs', 'en', 'pt' );
 		if ( ! empty( $attr['lang'] ) && in_array( strtolower( $attr['lang'] ), $allowed_langs, true ) ) {
 			$lang = strtolower( $attr['lang'] );
 		}
@@ -156,7 +162,7 @@ class ACADPUSH_Public {
 		$api_response = $this->zp_retrieve_json($page, $options, $shortcode_specific_keyword, $shortcode_specific_type, $shortcode_specific_subtype);
 
 		if ( is_wp_error( $api_response ) ) {
-			return '<div class="dyzc-error"><p>' . esc_html__( 'Unable to load publications. Please try again later.', 'academic-publications-showcase' ) . '</p></div>';
+			return '<div class="dyzc-error"><p>' . esc_html__( 'Unable to load publications. Please try again later.', 'yacadpush' ) . '</p></div>';
 		}
 
 		if ( ! $api_response || ! isset( $api_response->hits->hits ) || empty( $api_response->hits->hits ) ) {
@@ -230,7 +236,10 @@ class ACADPUSH_Public {
 				$html .= '<p class="dyzc-abstract-short">' . esc_html($short_desc) . '</p>';
 				if (mb_strlen($clean_desc) > 200) {
 					$html .= '<p class="dyzc-abstract-full" style="display:none;">' . esc_html($clean_desc) . '</p>';
-					$html .= '<button class="dyzc-toggle-abstract" data-expanded="false">' . esc_html( $this->get_label('show_more', $lang) ) . '</button>';
+					$html .= '<button class="dyzc-toggle-abstract" data-expanded="false"'
+						. ' data-label-more="' . esc_attr( $this->get_label('show_more', $lang) ) . '"'
+						. ' data-label-less="' . esc_attr( $this->get_label('show_less', $lang) ) . '">'
+						. esc_html( $this->get_label('show_more', $lang) ) . '</button>';
 				}
 				$html .= '</div>';
 			}
@@ -290,15 +299,20 @@ class ACADPUSH_Public {
 		// FONTE: banco de dados próprio
 		// -----------------------------------------------------------------------
 		if ( $choice === 'database' ) {
-			$transient_key = 'acadpush_db_' . md5( $final_keyword . $type_filter . $subtype_filter . $page . $size );
-			$cached = get_transient( $transient_key );
-			if ( $cached !== false ) {
-				return $cached;
-			}
-
 			$db = new ACADPUSH_DB();
 			if ( ! $db->connect( $options ) ) {
 				return new WP_Error( 'db_connect', $db->connect_error );
+			}
+
+			// The data version is part of the key, so reloading the database
+			// with json_to_db.py invalidates the cache without touching WordPress.
+			$transient_key = 'acadpush_db_' . md5( wp_json_encode( array(
+				$db->data_version(), $final_keyword, $type_filter, $subtype_filter, $page, $size,
+			) ) );
+			$cached = get_transient( $transient_key );
+			if ( $cached !== false ) {
+				$db->close();
+				return $cached;
 			}
 
 			$data = $db->query_publications( $page, $size, $final_keyword, $type_filter, $subtype_filter );
@@ -386,17 +400,35 @@ class ACADPUSH_Public {
 	}
 
 	private function format_date($date_string, $lang) {
-		$timestamp = strtotime($date_string);
-		if (!$timestamp) return esc_html($date_string);
+		$date_string = trim( (string) $date_string );
 
-		$months_cs = array('', 'Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen', 'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec');
-		$months_en = array('', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December');
+		// Partial dates are common in bibliographic data. strtotime() reads a bare
+		// "2025" as the time 20:25 today, so years and year-months are parsed here.
+		if ( preg_match( '/^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?/', $date_string, $m ) ) {
+			$year      = $m[1];
+			$month_num = isset( $m[2] ) ? (int) $m[2] : 0;
+		} else {
+			$timestamp = strtotime( $date_string );
+			if ( ! $timestamp ) return esc_html( $date_string );
+			$year      = gmdate( 'Y', $timestamp );
+			$month_num = (int) gmdate( 'n', $timestamp );
+		}
 
-		$month_num = (int)gmdate('n', $timestamp);
-		$year = gmdate('Y', $timestamp);
+		if ( $month_num < 1 || $month_num > 12 ) {
+			return esc_html( $year );
+		}
 
-		$month = ($lang === 'cs') ? $months_cs[$month_num] : $months_en[$month_num];
-		return $month . ', ' . $year;
+		$months = array(
+			'cs' => array('', 'Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen', 'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec'),
+			'en' => array('', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'),
+			'pt' => array('', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'),
+		);
+		$names = isset( $months[ $lang ] ) ? $months[ $lang ] : $months['en'];
+
+		if ( $lang === 'pt' ) {
+			return esc_html( $names[ $month_num ] . ' de ' . $year );
+		}
+		return esc_html( $names[ $month_num ] . ', ' . $year );
 	}
 
 	private function get_label($key, $lang) {
@@ -420,6 +452,16 @@ class ACADPUSH_Public {
 				'show_less'        => 'Show less',
 				'previous'         => 'Previous',
 				'next'             => 'Next',
+			),
+			'pt' => array(
+				'no_results'       => 'Nenhuma publicação encontrada.',
+				'view_publication' => 'Publicação',
+				'view_pdf'         => 'PDF',
+				'view_repository'  => 'Repositório',
+				'show_more'        => 'Mostrar mais',
+				'show_less'        => 'Mostrar menos',
+				'previous'         => 'Anterior',
+				'next'             => 'Próxima',
 			),
 		);
 

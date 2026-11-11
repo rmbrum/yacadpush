@@ -33,10 +33,9 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-import mysql.connector
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -46,6 +45,9 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 
 def get_connection():
+    # Imported here so that --dry-run works without the MySQL driver installed.
+    import mysql.connector
+
     return mysql.connector.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=int(os.getenv("DB_PORT", 3306)),
@@ -73,17 +75,42 @@ def _parse_date(value: str | None) -> str | None:
 
 
 def _now() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ---------------------------------------------------------------------------
 # Operações por tabela
 # ---------------------------------------------------------------------------
 
-def _upsert_publication(cursor, entry: dict[str, Any], update: bool) -> int | None:
+def _ieee_links(related_identifiers: list[dict[str, Any]]) -> tuple[str, str]:
+    """
+    Return (html_url, pdf_url) from the IEEE Xplore related identifiers.
+
+    ieee_to_zenodo.py writes the article page as `isAlternateIdentifier`
+    (https://ieeexplore.ieee.org/document/N) and the PDF as `isIdenticalTo`
+    (https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=N), which
+    contains neither ".pdf" nor "pdf", so the relation is what tells them apart.
+    """
+    html = pdf = ""
+    for ri in related_identifiers:
+        ident = ri.get("identifier", "")
+        if "ieeexplore.ieee.org" not in ident:
+            continue
+        rel = ri.get("relation", "")
+        if rel == "isIdenticalTo" or "/stamp/" in ident or ident.lower().endswith(".pdf"):
+            pdf = pdf or ident
+        else:
+            html = html or ident
+    return html, pdf
+
+
+def _upsert_publication(
+    cursor, entry: dict[str, Any], update: bool
+) -> tuple[int | None, str]:
     """
     Insere ou atualiza a tabela publications.
-    Retorna o id do registro, ou None se foi ignorado (sem --update).
+    Returns (id, action) with action "insert", "update" or "skip" (id None:
+    the DOI already exists and --update was not given).
     """
     meta = entry.get("zenodo_metadata", {})
     doi = entry.get("doi", "")
@@ -94,27 +121,14 @@ def _upsert_publication(cursor, entry: dict[str, Any], update: bool) -> int | No
     existing_id = row[0] if row else None
 
     if existing_id and not update:
-        return None  # ignora
+        return None, "skip"
 
     # Extrai campos escalares
     pub_date_raw = meta.get("publication_date", "")
     # Aceita só ano para MySQL DATE: converte para None e guarda em publication_date (VARCHAR)
     embargo_date = _parse_date(meta.get("embargo_date"))
 
-    ieee_html = ""
-    ieee_pdf = ""
-    for ri in meta.get("related_identifiers", []):
-        rel = ri.get("relation", "")
-        ident = ri.get("identifier", "")
-        if "ieeexplore.ieee.org" in ident:
-            if ri.get("resource_type") == "publication-article":
-                if rel == "isAlternateIdentifier":
-                    ieee_html = ident
-                elif rel == "isIdenticalTo" and ident.endswith(".pdf") or "pdf" in ident.lower():
-                    ieee_pdf = ident
-        # fallback: qualquer ieee link não classificado
-        if "ieeexplore.ieee.org" in ident and not ieee_html and not ieee_pdf:
-            ieee_html = ident
+    ieee_html, ieee_pdf = _ieee_links(meta.get("related_identifiers", []))
 
     collected_at = None
     if entry.get("collected_at"):
@@ -163,7 +177,7 @@ def _upsert_publication(cursor, entry: dict[str, Any], update: bool) -> int | No
             f"UPDATE publications SET {set_clause} WHERE id = %s",
             values,
         )
-        return existing_id
+        return existing_id, "update"
     else:
         cols = ", ".join(f"`{k}`" for k in fields)
         placeholders = ", ".join(["%s"] * len(fields))
@@ -171,7 +185,7 @@ def _upsert_publication(cursor, entry: dict[str, Any], update: bool) -> int | No
             f"INSERT INTO publications ({cols}) VALUES ({placeholders})",
             list(fields.values()),
         )
-        return cursor.lastrowid
+        return cursor.lastrowid, "insert"
 
 
 def _replace_authors(cursor, pub_id: int, meta: dict[str, Any]) -> None:
@@ -269,7 +283,7 @@ def load_json(
         doi = entry.get("doi", "")
         title = entry.get("zenodo_metadata", {}).get("title", "")[:60]
         try:
-            pub_id = _upsert_publication(cursor, entry, update)
+            pub_id, action = _upsert_publication(cursor, entry, update)
 
             if pub_id is None:
                 print(f"  [skip]   {doi}")
@@ -283,16 +297,6 @@ def load_json(
             _replace_communities(cursor, pub_id, meta)
 
             conn.commit()
-
-            # Determina se foi insert ou update
-            cursor.execute(
-                "SELECT COUNT(*) FROM publications WHERE id = %s AND imported_at = updated_at",
-                (pub_id,),
-            )
-            action = "insert"
-            # Simplificado: se o registro já existia antes, é update
-            if entry.get("status") in ("uploaded", "published") and entry.get("zenodo_deposit_id"):
-                action = "update"
 
             if action == "update":
                 print(f"  [update] {doi} | {title}")

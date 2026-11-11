@@ -25,7 +25,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
  */
 
 // Delete main plugin options
-delete_option( 'academic-publications-showcase' );
+delete_option( 'yacadpush' );
 
 // Delete all transients with acadpush_ prefix (cached API responses)
 global $wpdb;
@@ -38,7 +38,7 @@ $wpdb->query(
 
 // Delete postmeta entries (if plugin stored any)
 $acadpush_keys = array(
-	'academic-publications-showcase'
+	'yacadpush'
 );
 
 foreach ( $acadpush_keys as $acadpush_key ) {

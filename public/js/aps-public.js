@@ -18,18 +18,15 @@
 				$fullText.hide();
 				$button.attr('data-expanded', 'false');
 
-				// Update button text based on language
-				var lang = $('.dyzc-publications-grid').hasClass('lang-cs') ? 'cs' : 'en';
-				$button.text(lang === 'cs' ? 'Zobrazit více' : 'Show more');
+				// Labels come from the server, already in the page language
+				$button.text($button.attr('data-label-more') || 'Show more');
 			} else {
 				// Hide short, show full
 				$shortText.hide();
 				$fullText.show();
 				$button.attr('data-expanded', 'true');
 
-				// Update button text based on language
-				var lang = $('.dyzc-publications-grid').hasClass('lang-cs') ? 'cs' : 'en';
-				$button.text(lang === 'cs' ? 'Zobrazit méně' : 'Show less');
+				$button.text($button.attr('data-label-less') || 'Show less');
 			}
 		});
 	});

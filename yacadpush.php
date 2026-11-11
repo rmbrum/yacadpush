@@ -2,30 +2,34 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 /**
- * Academic Publications Showcase
+ * YACADPUSH: Yet Another Academic Publication Showcase
  *
- * Display publications from Zenodo communities or ORCID author profiles on WordPress sites.
- * Based on "Display Your Zenodo Community" by DARIAH-EU.
+ * Display publications from Zenodo communities, ORCID author profiles or a local
+ * MySQL database on WordPress sites.
+ * Fork of "Academic Publications Showcase" 1.0.0 by Martin Haváček, itself based on
+ * "Display Your Zenodo Community" by DARIAH-EU.
  *
  * @package           Academic_Publications_Showcase
- * @link              https://hvck.cz/
+ * @link              https://github.com/rmbrum/yacadpush
  * @since             1.0.0
  *
  * @wordpress-plugin
- * Plugin Name:       Academic Publications Showcase
- * Description:       Display publications from Zenodo communities or ORCID author profiles. Based on Display Your Zenodo Community by DARIAH-EU.
- * Version:           1.0.0
+ * Plugin Name:       YACADPUSH: Yet Another Academic Publication Showcase
+ * Plugin URI:        https://github.com/rmbrum/yacadpush
+ * Description:       Display publications from Zenodo communities, ORCID author profiles or a local MySQL database. Fork of Academic Publications Showcase by Martin Haváček, based on Display Your Zenodo Community by DARIAH-EU.
+ * Version:           2.0.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
- * Author:            Martin Haváček
- * Author URI:        https://hvck.cz/
+ * Author:            Raphael Brum; Martin Haváček (original)
+ * Author URI:        https://github.com/rmbrum
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       academic-publications-showcase
+ * Text Domain:       yacadpush
  * Domain Path:       /languages
  *
  * Copyright (C) 2020 DARIAH-ERIC (original Display Your Zenodo Community plugin)
  * Copyright (C) 2026 Martin Haváček (modifications and enhancements)
+ * Copyright (C) 2026 Raphael Brum (YACADPUSH: local database source and pipeline)
  *
  * This plugin is based on "Display Your Zenodo Community" originally developed by DARIAH-EU.
  * Developed as part of the project "Research of Excellence on Digital Technologies and Wellbeing"
@@ -40,6 +44,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 define( 'ACADPUSH_ROOT', dirname( __FILE__ ) );
+define( 'YACADPUSH_VERSION', '2.0.0' );
 
 /**
  * The code that runs during plugin activation.

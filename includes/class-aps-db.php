@@ -21,6 +21,33 @@ class ACADPUSH_DB {
     public $connect_error = null;
 
     /**
+     * `upload_type` values that belong to the Zenodo `publication` family
+     * (the generic `publication` plus every publication subtype).
+     */
+    const PUBLICATION_UPLOAD_TYPES = [
+        'publication', 'annotationcollection', 'book', 'section', 'conferencepaper',
+        'datamanagementplan', 'article', 'patent', 'preprint', 'deliverable',
+        'milestone', 'proposal', 'report', 'softwaredocumentation',
+        'taxonomictreatment', 'technicalnote', 'thesis', 'workingpaper', 'other',
+    ];
+
+    /**
+     * Cheap fingerprint of the data: changes whenever json_to_db.py inserts,
+     * updates or deletes rows. Used in the cache key so a reload shows up at once.
+     */
+    public function data_version(): string {
+        if ( ! $this->conn ) {
+            return '';
+        }
+        $res = $this->conn->query( 'SELECT COUNT(*), MAX(updated_at) FROM publications' );
+        if ( ! $res ) {
+            return '';
+        }
+        $row = $res->fetch_row();
+        return implode( '|', array_map( 'strval', $row ) );
+    }
+
+    /**
      * Abre a conexão com o banco.
      *
      * @param array $options Opções do plugin (contém db_host, db_port, etc.)
@@ -116,24 +143,31 @@ class ACADPUSH_DB {
                 )
                 OR p.title LIKE ?
             )';
-            $kw_like = '%' . $this->conn->real_escape_string( $keyword ) . '%';
+            // The value is bound as a parameter, so it must not be SQL-escaped;
+            // only the LIKE wildcards (and the escape character) are escaped.
+            $kw_like = '%' . addcslashes( $keyword, '\\%_' ) . '%';
             $params[] = $kw_like;
             $params[] = $kw_like;
             $types   .= 'ss';
         }
 
-        if ( ! empty( $type_filter ) ) {
-            $where_clauses[] = 'p.upload_type = ?';
-            $params[]        = $type_filter;
-            $types          .= 's';
-        }
-
-        // subtype é armazenado como keyword pelo ieee_to_zenodo.py
-        // mas o upload_type (article, conferencepaper, etc.) mapeia subtypes
+        // The shortcode speaks Zenodo vocabulary: `type` is a family
+        // (publication, dataset, software...) and `subtype` a publication kind
+        // (article, conferencepaper...). The database stores a single
+        // `upload_type`, which holds the subtype for publications.
         if ( ! empty( $subtype_filter ) ) {
             $where_clauses[] = 'p.upload_type = ?';
             $params[]        = $subtype_filter;
             $types          .= 's';
+        } elseif ( ! empty( $type_filter ) ) {
+            $family = $type_filter === 'publication'
+                ? self::PUBLICATION_UPLOAD_TYPES
+                : [ $type_filter ];
+            $where_clauses[] = 'p.upload_type IN (' . implode( ',', array_fill( 0, count( $family ), '?' ) ) . ')';
+            foreach ( $family as $t ) {
+                $params[] = $t;
+                $types   .= 's';
+            }
         }
 
         $where_sql = implode( ' AND ', $where_clauses );
@@ -320,6 +354,19 @@ class ACADPUSH_DB {
             'software'         => 'Software',
             'publication'      => 'Publication',
         ];
+        if ( function_exists( 'get_locale' ) && strpos( strtolower( get_locale() ), 'pt' ) === 0 ) {
+            $map = [
+                'article'          => 'Artigo em periódico',
+                'conferencepaper'  => 'Artigo em evento',
+                'book'             => 'Livro',
+                'section'          => 'Capítulo de livro',
+                'report'           => 'Relatório',
+                'thesis'           => 'Tese ou dissertação',
+                'dataset'          => 'Conjunto de dados',
+                'software'         => 'Software',
+                'publication'      => 'Publicação',
+            ] + $map;
+        }
         return $map[ $type ] ?? ucfirst( $type );
     }
 

@@ -53,12 +53,12 @@ class ACADPUSH {
 	 * @since    1.0.0
 	 */
 	public function __construct() {
-		if ( defined( 'ZENODO_PLUGIN_VERSION' ) ) {
-			$this->version = ZENODO_PLUGIN_VERSION;
+		if ( defined( 'YACADPUSH_VERSION' ) ) {
+			$this->version = YACADPUSH_VERSION;
 		} else {
-			$this->version = '1.0.0';
+			$this->version = '2.0.0';
 		}
-		$this->plugin_name = 'academic-publications-showcase';
+		$this->plugin_name = 'yacadpush';
 		$this->load_dependencies();
 		$this->set_locale();
 		$this->define_admin_hooks();

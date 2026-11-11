@@ -1,18 +1,20 @@
-=== Academic Publications Showcase ===
-Contributors: @havacekm
+=== YACADPUSH: Yet Another Academic Publication Showcase ===
+Contributors: rmbrum, @havacekm
 Tags: zenodo, publications, orcid, academic, research
 Requires at least: 6.0
-Tested up to: 6.9
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Display publications from Zenodo communities or ORCID author profiles with modern card layouts and customizable designs.
+Display publications from Zenodo communities, ORCID author profiles or a local MySQL database with modern card layouts and customizable designs.
 
 == Description ==
 
-Academic Publications Showcase allows you to display content from [Zenodo](https://zenodo.org/) communities or author publications using ORCID identifiers on your WordPress site. Perfect for researchers, academic institutions, and research projects who want to integrate a dynamic bibliography of their work with their website.
+YACADPUSH is a fork of Academic Publications Showcase 1.0.0 by Martin Haváček (itself based on Display Your Zenodo Community by DARIAH-EU). It adds a third data source: a local MySQL database fed by a Python pipeline (IEEE Xplore and CrossRef metadata), see https://github.com/rmbrum/yacadpush.
+
+The original plugin allows you to display content from [Zenodo](https://zenodo.org/) communities or author publications using ORCID identifiers on your WordPress site. Perfect for researchers, academic institutions, and research projects who want to integrate a dynamic bibliography of their work with their website.
 
 **Key Features:**
 

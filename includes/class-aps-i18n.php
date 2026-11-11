@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Define the internationalization functionality.
  *
  * WordPress automatically loads translation files from the /languages/ directory since version 4.6.
- * Translation files should be named: academic-publications-showcase-{locale}.mo
+ * Translation files should be named: yacadpush-{locale}.mo
  *
  * @since      1.0.0
  * @package    Academic_Publications_Showcase
