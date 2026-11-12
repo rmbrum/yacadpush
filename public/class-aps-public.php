@@ -751,12 +751,21 @@ class ACADPUSH_Public {
 			$hits = $this->sort_hits_by_type( $hits );
 		}
 		$current_group = null;
+		$options  = get_option( $this->plugin_name );
+		$compound = ACADPUSH_Citation::parse_surname_list( isset( $options['abnt_compound_surnames'] ) ? $options['abnt_compound_surnames'] : '' );
+		/**
+		 * Filters the surnames that ABNT enters whole instead of by their last word.
+		 *
+		 * @param string[] $compound Surnames from the Design tab, one per entry ("Gomez Caicedo").
+		 */
+		$compound     = (array) apply_filters( 'yacadpush_abnt_compound_surnames', $compound );
 		$formatter    = new ACADPUSH_Citation(
 			array(
 				'volume' => $this->get_label( 'volume', $lang ),
 				'issue'  => $this->get_label( 'issue', $lang ),
 				'pages'  => $this->get_label( 'pages', $lang ),
-			)
+			),
+			$compound
 		);
 		$html         = '';
 		$current_year = null;

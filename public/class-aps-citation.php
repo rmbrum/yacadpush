@@ -35,14 +35,53 @@ class ACADPUSH_Citation {
 	/** Lowercase name particles left out of initials ("Elias de Almeida" -> "E. A."). */
 	const PARTICLES = array( 'da', 'das', 'de', 'del', 'della', 'der', 'di', 'do', 'dos', 'du', 'e', 'van', 'von', 'y', 'la', 'le', 'den', 'ten', 'ter' );
 
+	/** ABNT: particles that leave the front of the surname and of the part before the entry. */
+	const ABNT_PARTICLES = array( 'da', 'das', 'de', 'do', 'dos', 'e', 'del', 'y' );
+
+	/** ABNT: words that enter together with the previous one ("ROSA JÚNIOR", "AMERICO FILHO"). */
+	const ABNT_SUFFIXES = array( 'filho', 'junior', 'júnior', 'jr', 'jr.', 'neto', 'sobrinho' );
+
+	/** ABNT: prefixes that stay with the entry ("DAL BEM", "LA ROSA", "VAN DER PLAS"). */
+	const ABNT_PREFIXES = array( 'dal', 'dalla', 'della', 'dei', 'di', 'du', 'la', 'le', 'lo', 'van', 'von', 'der', 'den', 'ter', 'ten' );
+
 	/** @var array Labels for the "simple" style, in the page language (volume, issue, pages). */
 	private $labels;
 
-	public function __construct( array $labels = array() ) {
+	/** @var array Surnames ABNT keeps whole, as name_key() => true. */
+	private $compound = array();
+
+	/**
+	 * @param array $labels   volume, issue and pages labels for "simple".
+	 * @param array $compound Surnames that ABNT enters whole instead of by the last word
+	 *                        ("Gomez Caicedo"), compared ignoring case and accents.
+	 */
+	public function __construct( array $labels = array(), array $compound = array() ) {
 		$this->labels = array_merge(
 			array( 'volume' => 'vol.', 'issue' => 'no.', 'pages' => 'pp.' ),
 			$labels
 		);
+		foreach ( $compound as $surname ) {
+			$key = $this->name_key( (string) $surname );
+			if ( $key !== '' ) {
+				$this->compound[ $key ] = true;
+			}
+		}
+	}
+
+	/**
+	 * Splits a list of surnames typed one per line; blank lines and lines starting with "#" are skipped.
+	 *
+	 * @return string[]
+	 */
+	public static function parse_surname_list( $text ) {
+		$out = array();
+		foreach ( preg_split( '/\r\n|\r|\n/', (string) $text ) as $line ) {
+			$line = trim( preg_replace( '/\s+/u', ' ', $line ) );
+			if ( $line !== '' && $line[0] !== '#' ) {
+				$out[] = $line;
+			}
+		}
+		return $out;
 	}
 
 	public static function is_style( $style ) {
@@ -258,15 +297,11 @@ class ACADPUSH_Citation {
 
 		switch ( $form ) {
 			case 'abnt':       // SILVA, João Carlos | SILVA, J. C.
-				// Portuguese and Spanish particles go after the given names:
-				// "de Moura, Rafael" -> "MOURA, Rafael de".
-				$particle = '';
-				if ( preg_match( '/^(d[aeo]s?|del|e)\s+(.+)$/iu', $family, $pm ) ) {
-					$particle = ' ' . $this->lower( $pm[1] );
-					$family   = $pm[2];
-				}
-				$text = $this->upper( $family ) . ( $given !== '' || $particle !== '' ? ', ' . ( $initials ? $this->initials( $given, false, true ) : $given ) . $particle : '' );
-				$text = str_replace( ',  ', ', ', $text );
+				// Entry by the last surname (NBR 6023): "Furlanetto de Azambuja, José Rodrigo"
+				// -> "AZAMBUJA, José Rodrigo Furlanetto de" | "AZAMBUJA, J. R. F. de".
+				list( $entry, $rest, $particles ) = $this->abnt_split( $family, $given );
+				$after = $this->join( array( $initials ? $this->initials( $rest, false, true ) : $rest, $particles ), ' ' );
+				$text  = $this->upper( $entry ) . ( $after !== '' ? ', ' . $after : '' );
 				break;
 			case 'inverted':   // Silva, João Carlos | Silva, J. C.
 				$text = $family . ( $given !== '' ? ', ' . ( $initials ? $short : $given ) : '' );
@@ -283,6 +318,61 @@ class ACADPUSH_Citation {
 
 		$attr = $person['affiliation'] !== '' ? ' title="' . esc_attr( $person['affiliation'] ) . '"' : '';
 		return '<span class="dyzc-author"' . $attr . '>' . esc_html( $text ) . '</span>';
+	}
+
+	/**
+	 * ABNT entry: which words of the surname head the name, and what goes after the given names.
+	 *
+	 * 1. Particles at the front (da, de, dos, e, del, y...) leave it.
+	 * 2. A surname in the compound list is the entry as a whole.
+	 * 3. Otherwise the entry is the last word, taking along a preceding word when it is a suffix
+	 *    (Júnior, Filho, Neto, Sobrinho) and foreign prefixes before it (Dal, La, Van der...).
+	 * 4. The rest of the surname follows the given names; particles that stood right before the
+	 *    entry go to the end. With nothing left but particles, those at the front go there too.
+	 *
+	 * @return array [ entry, given names followed by the rest of the surname, trailing particles ]
+	 */
+	private function abnt_split( $family, $given ) {
+		$is_particle = function ( $word ) {
+			return in_array( $this->lower( $word ), self::ABNT_PARTICLES, true );
+		};
+
+		$words = preg_split( '/\s+/u', trim( $family ), -1, PREG_SPLIT_NO_EMPTY );
+		$lead  = array();
+		while ( count( $words ) > 1 && $is_particle( $words[0] ) ) {
+			$lead[] = $this->lower( array_shift( $words ) );
+		}
+
+		$count = count( $words );
+		if ( $count <= 1 || isset( $this->compound[ $this->name_key( implode( ' ', $words ) ) ] ) ) {
+			$entry = $words;
+			$rest  = array();
+		} else {
+			$n = in_array( $this->lower( $words[ $count - 1 ] ), self::ABNT_SUFFIXES, true ) ? 2 : 1;
+			while ( $count > $n && in_array( $this->lower( $words[ $count - $n - 1 ] ), self::ABNT_PREFIXES, true ) ) {
+				$n++;
+			}
+			$entry = array_slice( $words, $count - $n );
+			$rest  = array_slice( $words, 0, $count - $n );
+		}
+
+		$particles = array();
+		while ( $rest && $is_particle( end( $rest ) ) ) {
+			array_unshift( $particles, $this->lower( array_pop( $rest ) ) );
+		}
+		if ( ! $rest ) {
+			$particles = array_merge( $lead, $particles );
+			$lead      = array();
+		}
+
+		$after = trim( $given . ' ' . implode( ' ', array_merge( $lead, $rest ) ) );
+		return array( implode( ' ', $entry ), $after, implode( ' ', $particles ) );
+	}
+
+	/** Comparison key for surnames: no accents, lowercase, single spaces. */
+	private function name_key( $s ) {
+		$s = function_exists( 'remove_accents' ) ? remove_accents( $s ) : $s;
+		return $this->lower( trim( preg_replace( '/\s+/u', ' ', $s ) ) );
 	}
 
 	/** "et al." in the markup the stylesheet expects. */

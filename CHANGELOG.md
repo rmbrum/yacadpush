@@ -1,3 +1,17 @@
+## [2.4.0] - 2026-11-12
+
+### Changed
+- ABNT enters names by the last surname (NBR 6023): "Furlanetto de Azambuja, José Rodrigo" is now
+  "AZAMBUJA, J. R. F. de" instead of "FURLANETTO DE AZAMBUJA, J. R.". The rest of the surname follows the
+  given names, and particles before the entry go to the end. Júnior, Filho, Neto and Sobrinho stay
+  with the word before them, and foreign prefixes (Dal, La, Van der...) with the entry. The other
+  styles are unchanged.
+
+### Added
+- Design tab, "ABNT: surnames kept whole": surnames ABNT must not split ("Gomez Caicedo"), one per
+  line, compared ignoring case and accents. Also available as the `yacadpush_abnt_compound_surnames`
+  filter.
+
 ## [2.3.0] - 2026-11-12
 
 ### Added

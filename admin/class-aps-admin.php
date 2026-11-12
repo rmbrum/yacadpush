@@ -232,6 +232,11 @@ class ACADPUSH_Admin {
 		$allowed_radius  = array( 'none', 'small', 'medium', 'large' );
 		$valid['border_radius']  = isset( $input['border_radius'] ) && in_array( $input['border_radius'], $allowed_radius, true ) ? $input['border_radius'] : 'medium';
 
+		// Citations: only the Design tab sends this field; the other tabs keep the stored value.
+		$valid['abnt_compound_surnames'] = isset( $input['abnt_compound_surnames'] )
+			? sanitize_textarea_field( $input['abnt_compound_surnames'] )
+			: ( isset( $existing['abnt_compound_surnames'] ) ? $existing['abnt_compound_surnames'] : '' );
+
 		return $valid;
 	}
 }

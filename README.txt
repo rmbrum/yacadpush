@@ -4,7 +4,7 @@ Tags: zenodo, publications, orcid, academic, research
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.3.0
+Stable tag: 2.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -130,10 +130,17 @@ the style's author rule: three authors, then "et al.". `citation_select='yes'` s
 visitor can switch styles (query argument `pub_cite`).
 
 Name handling: names are read as stored ("Family, Given"). Names without a comma are read as
-"Given Family". In ABNT, a Portuguese or Spanish particle that starts the family name moves after
-the given names ("de Moura, Rafael" becomes "MOURA, Rafael de"), and particles stay in abbreviated
-names ("RAMOS, E. de A."). The other styles leave particles out of the initials. Titles are printed
-as stored: there is no conversion to sentence case or title case, and journal names are not abbreviated.
+"Given Family". ABNT enters a name by its last surname (NBR 6023): "Furlanetto de Azambuja, José
+Rodrigo" becomes "AZAMBUJA, José Rodrigo Furlanetto de" or "AZAMBUJA, J. R. F. de". The rest of the
+surname follows the given names. Portuguese and Spanish particles (da, de, dos, e, del, y...) that
+stood before the entry go to the end: "de Moura, Rafael" becomes "MOURA, Rafael de". Some words stay
+with the entry: Júnior, Filho, Neto and Sobrinho with the word before them ("ROSA JÚNIOR"), and
+foreign prefixes ("DAL BEM", "LA ROSA", "VAN DER PLAS"). Surnames that must not be split ("Gomez
+Caicedo") are listed in Settings, Design, "ABNT: surnames kept whole", one per line, or passed
+through the `yacadpush_abnt_compound_surnames` filter; case and accents are ignored. In ABNT,
+particles stay in abbreviated names ("RAMOS, E. de A."). The other styles keep the surname as
+stored and leave particles out of the initials. Titles are printed as stored: there is no conversion
+to sentence case or title case, and journal names are not abbreviated.
 
 `[showcase-publications view='compact' group='type' per_page='100' year_filter='yes']`
 

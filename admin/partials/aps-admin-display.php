@@ -40,6 +40,7 @@ $acadpush_font_family = isset( $acadpush_options['font_family'] ) ? $acadpush_op
 $acadpush_font_size = isset( $acadpush_options['font_size'] ) ? $acadpush_options['font_size'] : 'medium';
 $acadpush_card_layout = isset( $acadpush_options['card_layout'] ) ? $acadpush_options['card_layout'] : 'standard';
 $acadpush_border_radius = isset( $acadpush_options['border_radius'] ) ? $acadpush_options['border_radius'] : 'medium';
+$acadpush_abnt_compound = isset( $acadpush_options['abnt_compound_surnames'] ) ? $acadpush_options['abnt_compound_surnames'] : '';
 
 // Validate tab parameter against allowlist
 $acadpush_allowed_tabs = array( 'api', 'database', 'design', 'usage' );
@@ -430,6 +431,31 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 										<option value="medium" <?php selected( $acadpush_border_radius, 'medium' ); ?>>Medium (8px)</option>
 										<option value="large" <?php selected( $acadpush_border_radius, 'large' ); ?>>Large (12px)</option>
 									</select>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+
+				<div class="dyzc-section">
+					<h3>Citations</h3>
+					<table class="form-table">
+						<tbody>
+							<tr>
+								<th scope="row">
+									<label for="<?php echo esc_attr( $this->plugin_name ); ?>-abnt-compound">ABNT: surnames kept whole</label>
+								</th>
+								<td>
+									<textarea name="<?php echo esc_attr( $this->plugin_name ); ?>[abnt_compound_surnames]"
+									          id="<?php echo esc_attr( $this->plugin_name ); ?>-abnt-compound"
+									          rows="6" cols="40" class="large-text code"><?php echo esc_textarea( $acadpush_abnt_compound ); ?></textarea>
+									<p class="description">
+										The ABNT style enters a name by its last surname: "Furlanetto de Azambuja, José Rodrigo"
+										becomes "AZAMBUJA, J. R. F. de". List here, one per line, the surnames that must stay whole
+										(for example "Gomez Caicedo" gives "GOMEZ CAICEDO, J. A."). Case and accents are ignored;
+										lines starting with # are comments. Developers can use the
+										<code>yacadpush_abnt_compound_surnames</code> filter instead.
+									</p>
 								</td>
 							</tr>
 						</tbody>

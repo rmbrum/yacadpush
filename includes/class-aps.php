@@ -56,7 +56,7 @@ class ACADPUSH {
 		if ( defined( 'YACADPUSH_VERSION' ) ) {
 			$this->version = YACADPUSH_VERSION;
 		} else {
-			$this->version = '2.3.0';
+			$this->version = '2.4.0';
 		}
 		$this->plugin_name = 'yacadpush';
 		$this->load_dependencies();
