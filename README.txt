@@ -4,7 +4,7 @@ Tags: zenodo, publications, orcid, academic, research
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.2.0
+Stable tag: 2.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -134,6 +134,43 @@ Name handling: names are read as stored ("Family, Given"). Names without a comma
 the given names ("de Moura, Rafael" becomes "MOURA, Rafael de"), and particles stay in abbreviated
 names ("RAMOS, E. de A."). The other styles leave particles out of the initials. Titles are printed
 as stored: there is no conversion to sentence case or title case, and journal names are not abbreviated.
+
+`[showcase-publications view='compact' group='type' per_page='100' year_filter='yes']`
+
+`per_page` sets the number of publications per page for this shortcode. Without it, the shortcode uses the
+API Settings value. The maximum is 1000 in database mode and 100 in Zenodo modes, which is the API limit.
+`group='type'` adds sub-headings inside each year of the compact list, in this order: Journal articles,
+Conference papers, Book chapters, Books, Preprints, Reports, Theses, then Other publications. The
+sub-headings are in the page language. In database mode each one shows its count for the whole year,
+and the list is ordered so that a page break never mixes the groups. In Zenodo modes the grouping only
+reorders the current page, without counts.
+
+**Database credentials outside wp_options**
+
+The Local Database tab stores its values in the WordPress database. To keep them in `wp-config.php`
+instead, define any of these constants; each one overrides its form field:
+
+    define( 'YACADPUSH_DB_HOST', 'localhost' );
+    define( 'YACADPUSH_DB_PORT', 3306 );
+    define( 'YACADPUSH_DB_NAME', 'publications' );
+    define( 'YACADPUSH_DB_USER', 'publications_ro' );
+    define( 'YACADPUSH_DB_PASSWORD', '...' );
+
+On a multisite network, `wp-config.php` is shared by every site, so the constants apply to all of them.
+For per-site values, use the `yacadpush_db_credentials` filter, for example from a mu-plugin:
+
+    add_filter( 'yacadpush_db_credentials', function ( $creds, $options ) {
+        if ( get_current_blog_id() === 42 ) {
+            $creds['name'] = 'publications';
+            $creds['user'] = 'publications_ro';
+            $creds['password'] = '...';
+        }
+        return $creds;
+    }, 10, 2 );
+
+The filter receives the array `host`, `port`, `name`, `user`, `password` after the constants have been
+applied, and it runs last. The Local Database tab lists the fields that come from either source. The plugin
+only reads the database, so give it a MySQL user with `SELECT` privilege only.
 
 **Available Type Values:**
 

@@ -1,3 +1,23 @@
+## [2.3.0] - 2026-11-12
+
+### Added
+- `per_page="N"` shortcode option: publications per page for that shortcode. The maximum is 1000
+  in database mode and 100 in Zenodo modes.
+- `group="type"` (compact view): type sub-headings inside each year (Journal articles, Conference
+  papers, Book chapters, Books, Preprints, Reports, Theses, Other), localized. In database mode they
+  show the year's count, and pages are ordered by year and then type
+  (`ACADPUSH_DB::count_by_year_and_type()`, `TYPE_GROUP_ORDER`).
+- Database credentials from `YACADPUSH_DB_HOST`, `_PORT`, `_NAME`, `_USER` and `_PASSWORD`
+  constants, and from the `yacadpush_db_credentials` filter (per-site values on multisite). The
+  admin form is the fallback, and the Local Database tab lists the fields overridden.
+- `json_to_db.py --prune`: deletes publications whose DOI is not in the JSON, with their child
+  rows. It works with `--dry-run`, and a safety stop applies above `--prune-max` percent (default
+  10) unless `--force` is given. It cannot be combined with `--status`.
+
+### Changed
+- `json_to_db.py` exits with status 1 when an entry fails, and with status 2 when the prune safety
+  stop is hit. It used to exit with 0 every time.
+
 ## [2.2.0] - 2026-11-12
 
 ### Added

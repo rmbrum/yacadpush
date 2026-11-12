@@ -222,6 +222,18 @@
 	border-bottom: 1px solid var(--dyzc-card-border, #dcdcde);
 }
 
+.dyzc-view-compact .dyzc-type-heading {
+	margin: 14px 0 4px;
+	font-size: 1em;
+	font-weight: 600;
+	color: var(--dyzc-meta, #646970);
+}
+
+.dyzc-view-compact .dyzc-year-heading + .dyzc-type-heading,
+.dyzc-view-compact .dyzc-toolbar + .dyzc-type-heading {
+	margin-top: 4px;
+}
+
 .dyzc-view-compact .dyzc-toolbar + .dyzc-year-heading {
 	margin-top: 0;
 }

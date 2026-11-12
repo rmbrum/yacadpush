@@ -204,6 +204,22 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 				<div class="dyzc-section">
 					<h3>MySQL Database Credentials</h3>
 					<p>Configure the connection to the MySQL database populated by <code>json_to_db.py</code>. Only used when <strong>Data Source</strong> is set to <em>Local Database</em>.</p>
+					<p class="description">The plugin only reads this database: give it a MySQL user with <code>SELECT</code> privilege only. To keep the credentials out of the WordPress database, define <code>YACADPUSH_DB_HOST</code>, <code>YACADPUSH_DB_PORT</code>, <code>YACADPUSH_DB_NAME</code>, <code>YACADPUSH_DB_USER</code> and <code>YACADPUSH_DB_PASSWORD</code> in <code>wp-config.php</code>, or return them from the <code>yacadpush_db_credentials</code> filter (for per-site values on a multisite network).</p>
+					<?php
+					$acadpush_creds = ACADPUSH_DB::credentials( is_array( $acadpush_options ) ? $acadpush_options : array() );
+					if ( ! empty( $acadpush_creds['overridden'] ) ) :
+						?>
+						<div class="notice notice-info inline"><p>
+							<?php
+							echo esc_html(
+								sprintf(
+									'Defined in wp-config.php or by the yacadpush_db_credentials filter, so the form value is ignored: %s.',
+									implode( ', ', $acadpush_creds['overridden'] )
+								)
+							);
+							?>
+						</p></div>
+					<?php endif; ?>
 					<table class="form-table">
 						<tbody>
 							<tr>
@@ -494,6 +510,16 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 							<td><code>max_authors</code></td>
 							<td>List this many authors, then "et al.", instead of the style's own rule.</td>
 							<td><code>'3'</code></td>
+						</tr>
+						<tr>
+							<td><code>per_page</code></td>
+							<td>Publications per page for this shortcode, instead of the API Settings value (max. 1000 in database mode, 100 with Zenodo).</td>
+							<td><code>'100'</code></td>
+						</tr>
+						<tr>
+							<td><code>group</code></td>
+							<td>Compact view: <code>type</code> adds sub-headings by publication type inside each year (with counts in database mode).</td>
+							<td><code>'type'</code></td>
 						</tr>
 						<tr>
 							<td><code>citation_select</code></td>

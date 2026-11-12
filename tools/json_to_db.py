@@ -27,6 +27,12 @@ Uso:
 
     # Pré-visualizar sem alterar o banco
     python json_to_db.py --dry-run publicacoes.json
+
+    # Sincronizar: também apagar do banco as publicações cujo DOI não está no JSON
+    python json_to_db.py --update --prune publicacoes.json
+    python json_to_db.py --prune --dry-run publicacoes.json   # só lista o que seria apagado
+    # Por segurança, --prune recusa apagar mais de 10% das publicações do banco
+    # (ajuste com --prune-max PCT) a menos que --force seja dado.
 """
 
 import argparse
@@ -247,32 +253,109 @@ def _replace_communities(cursor, pub_id: int, meta: dict[str, Any]) -> None:
 # Fluxo principal
 # ---------------------------------------------------------------------------
 
+CHILD_TABLES = ("authors", "keywords", "related_identifiers", "communities")
+
+
+def _prune_candidates(cursor, keep_dois: set[str]) -> tuple[list[tuple[int, str, str]], int]:
+    """Publications whose DOI (case-insensitive) is not in keep_dois, and the table size."""
+    cursor.execute("SELECT id, doi, title FROM publications")
+    rows = cursor.fetchall()
+    gone = [(pid, doi, title or "") for pid, doi, title in rows if (doi or "").strip().lower() not in keep_dois]
+    return gone, len(rows)
+
+
+def prune(
+    cursor,
+    conn,
+    keep_dois: set[str],
+    max_pct: float,
+    force: bool,
+    dry_run: bool,
+) -> bool:
+    """Delete publications (and their child rows) whose DOI is not in the JSON.
+
+    Returns False when the safety stop prevented the deletion.
+    """
+    gone, total = _prune_candidates(cursor, keep_dois)
+    pct = (100.0 * len(gone) / total) if total else 0.0
+    print()
+    print(f"Prune   : {len(gone)} de {total} publicações no banco não estão no JSON ({pct:.1f}%)")
+    for _pid, doi, title in gone:
+        print(f"  [{'dry-run' if dry_run else 'delete'}] {doi} | {title[:60]}")
+
+    if not gone:
+        return True
+    if pct > max_pct and not force:
+        print(
+            f"PARADA DE SEGURANÇA: apagaria {pct:.1f}% das publicações (limite {max_pct:g}%). "
+            "Nada foi apagado. Confira o JSON; para apagar mesmo assim, use --force "
+            "(ou ajuste --prune-max)."
+        )
+        return False
+    if dry_run:
+        return True
+
+    try:
+        ids = [pid for pid, _doi, _title in gone]
+        for start in range(0, len(ids), 500):
+            chunk = ids[start:start + 500]
+            marks = ",".join(["%s"] * len(chunk))
+            # The schema cascades, but delete the children explicitly in case the
+            # foreign keys were not created (e.g. MyISAM).
+            for table in CHILD_TABLES:
+                cursor.execute(f"DELETE FROM {table} WHERE publication_id IN ({marks})", chunk)
+            cursor.execute(f"DELETE FROM publications WHERE id IN ({marks})", chunk)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    print(f"Prune   : {len(gone)} publicações apagadas")
+    return True
+
+
 def load_json(
     json_file: str,
     update: bool = False,
     status_filter: str | None = None,
     dry_run: bool = False,
-) -> None:
+    do_prune: bool = False,
+    prune_max: float = 10.0,
+    force: bool = False,
+) -> int:
     with open(json_file, encoding="utf-8") as f:
         data = json.load(f)
 
-    entries = data.get("entries", [])
+    all_entries = data.get("entries", [])
+    entries = all_entries
     if status_filter:
         entries = [e for e in entries if e.get("status") == status_filter]
 
     print(f"Arquivo : {json_file}")
-    print(f"Entradas: {len(data.get('entries', []))} total | {len(entries)} a processar")
-    print(f"Modo    : {'dry-run' if dry_run else ('update' if update else 'insert-only')}")
+    print(f"Entradas: {len(all_entries)} total | {len(entries)} a processar")
+    print(f"Modo    : {'dry-run' if dry_run else ('update' if update else 'insert-only')}"
+          f"{' + prune' if do_prune else ''}")
     if status_filter:
         print(f"Filtro  : status = {status_filter}")
     print()
+
+    keep_dois = {(e.get("doi") or "").strip().lower() for e in all_entries if (e.get("doi") or "").strip()}
+    if do_prune and not keep_dois:
+        print("ERRO: --prune com um JSON sem nenhum DOI apagaria o banco inteiro. Nada foi feito.")
+        return 1
 
     if dry_run:
         for entry in entries:
             doi = entry.get("doi", "?")
             title = entry.get("zenodo_metadata", {}).get("title", "?")
             print(f"  [dry-run] {doi} | {title[:70]}")
-        return
+        if do_prune:
+            conn = get_connection()
+            cursor = conn.cursor()
+            ok = prune(cursor, conn, keep_dois, prune_max, force, dry_run=True)
+            cursor.close()
+            conn.close()
+            return 0 if ok else 2
+        return 0
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -310,11 +393,18 @@ def load_json(
             print(f"  [error]  {doi} | {e}")
             errors += 1
 
+    pruned_ok = True
+    if do_prune:
+        pruned_ok = prune(cursor, conn, keep_dois, prune_max, force, dry_run=False)
+
     cursor.close()
     conn.close()
 
     print()
     print(f"Concluído: {inserted} inseridos | {updated} atualizados | {skipped} ignorados | {errors} erros")
+    if errors:
+        return 1
+    return 0 if pruned_ok else 2
 
 
 # ---------------------------------------------------------------------------
@@ -340,14 +430,33 @@ def main() -> None:
         "--dry-run", action="store_true",
         help="Exibir o que seria feito sem alterar o banco",
     )
+    p.add_argument(
+        "--prune", action="store_true",
+        help="Apagar do banco as publicações (e seus autores, palavras-chave, identificadores "
+             "e comunidades) cujo DOI não está no JSON",
+    )
+    p.add_argument(
+        "--prune-max", metavar="PCT", type=float, default=10.0,
+        help="Parada de segurança do --prune: não apagar mais que PCT%% das publicações (padrão: 10)",
+    )
+    p.add_argument(
+        "--force", action="store_true",
+        help="Com --prune, apagar mesmo acima do limite de --prune-max",
+    )
     args = p.parse_args()
 
-    load_json(
+    if args.prune and args.status:
+        p.error("--prune não pode ser combinado com --status: o JSON inteiro define o que fica no banco")
+
+    sys.exit(load_json(
         json_file=args.json_file,
         update=args.update,
         status_filter=args.status,
         dry_run=args.dry_run,
-    )
+        do_prune=args.prune,
+        prune_max=args.prune_max,
+        force=args.force,
+    ))
 
 
 if __name__ == "__main__":

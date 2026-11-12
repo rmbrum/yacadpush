@@ -118,10 +118,14 @@ class ACADPUSH_Public {
 			'citation' => '',  // compact view: simple (default) | abnt | apa | ieee | vancouver | chicago
 			'names' => '',     // full (default) | initials; ABNT, Chicago and simple only
 			'max_authors' => '', // compact view: list N authors, then "et al." (default: the style's rule)
-			'citation_select' => '' // "yes" lets the visitor pick the citation style
+			'citation_select' => '', // "yes" lets the visitor pick the citation style
+			'per_page' => '',  // publications per page for this shortcode (default: the API Settings value)
+			'group' => ''      // compact view: "type" adds type sub-headings inside each year
 		), $attr, 'showcase-publications' );
 
 		$view = strtolower( trim( $attr['view'] ) ) === 'compact' ? 'compact' : 'cards';
+		$group_by_type = $view === 'compact' && strtolower( trim( $attr['group'] ) ) === 'type';
+		$per_page_attr = max( 0, (int) $attr['per_page'] );
 
 		list( $range_from, $range_to ) = $this->parse_year_range( $attr['year'] );
 		$show_year_filter = $this->is_yes( $attr['year_filter'] );
@@ -204,7 +208,8 @@ class ACADPUSH_Public {
 		$options = get_option($this->plugin_name);
 		$page = max(1, (int)get_query_var('zenodo_page', 1));
 
-		$api_response = $this->zp_retrieve_json($page, $options, $shortcode_specific_keyword, $shortcode_specific_type, $shortcode_specific_subtype, $year_from, $year_to);
+		$per_page = $this->page_size( $options, $per_page_attr );
+		$api_response = $this->zp_retrieve_json($page, $options, $shortcode_specific_keyword, $shortcode_specific_type, $shortcode_specific_subtype, $year_from, $year_to, $per_page, $group_by_type ? 'type' : 'date');
 
 		$wrapper_open = '<div class="dyzc-publications-grid dyzc-view-' . esc_attr( $view ) . ' lang-' . esc_attr( $lang ) . '">';
 
@@ -236,7 +241,6 @@ class ACADPUSH_Public {
 		$html = '';
 
 		$total_docs = is_object($api_response->hits->total) ? $api_response->hits->total->value : $api_response->hits->total;
-		$per_page = isset($options['number_publications']) ? max(1, (int)$options['number_publications']) : 10;
 		$nb_pages = ceil($total_docs / $per_page);
 
 		$html .= $wrapper_open . $toolbar;
@@ -244,7 +248,11 @@ class ACADPUSH_Public {
 		if ( $view === 'compact' ) {
 			// Year headings only help when the list spans more than one year.
 			$group_by_year = ! ( $year_from && $year_from === $year_to );
-			$html .= $this->render_compact_list( $api_response->hits->hits, $lang, $group_by_year, $citation, $names, $max_authors );
+			$type_counts = null;
+			if ( $group_by_type ) {
+				$type_counts = $this->retrieve_type_counts( $options, $shortcode_specific_keyword, $shortcode_specific_type, $shortcode_specific_subtype, $year_from, $year_to );
+			}
+			$html .= $this->render_compact_list( $api_response->hits->hits, $lang, $group_by_year, $citation, $names, $max_authors, $group_by_type, $type_counts );
 			$html .= $this->render_pagination( $page, $nb_pages, $lang );
 			// One dialog per list; the script fills it with the clicked item's card.
 			$html .= '<dialog class="dyzc-card-dialog" aria-label="' . esc_attr( $this->get_label( 'view_publication', $lang ) ) . '">'
@@ -361,10 +369,20 @@ class ACADPUSH_Public {
 		return $html;
 	}
 
-	private function zp_retrieve_json($page, $options, $keyword_override, $type_filter = '', $subtype_filter = '', $year_from = 0, $year_to = 0) {
+	/**
+	 * Publications per page: the shortcode's per_page, else the API Settings value.
+	 * The Zenodo API returns at most 100 records per request; the database allows 1000.
+	 */
+	private function page_size( $options, $per_page_attr = 0 ) {
+		$size = $per_page_attr > 0 ? $per_page_attr : ( isset( $options['number_publications'] ) ? (int) $options['number_publications'] : 10 );
+		$max  = ( isset( $options['choice'] ) && $options['choice'] === 'database' ) ? 1000 : 100;
+		return max( 1, min( $max, $size ) );
+	}
+
+	private function zp_retrieve_json($page, $options, $keyword_override, $type_filter = '', $subtype_filter = '', $year_from = 0, $year_to = 0, $size = 0, $order = 'date') {
 		$choice        = isset($options['choice']) ? $options['choice'] : 'community';
 		$extra_keyword = isset($options['extra_keyword']) ? trim($options['extra_keyword']) : '';
-		$size          = isset($options['number_publications']) ? max(1, min(100, (int)$options['number_publications'])) : 10;
+		$size          = $size > 0 ? (int) $size : $this->page_size( $options );
 		$final_keyword = !empty($keyword_override) ? $keyword_override : $extra_keyword;
 
 		// -----------------------------------------------------------------------
@@ -379,7 +397,7 @@ class ACADPUSH_Public {
 			// The data version is part of the key, so reloading the database
 			// with json_to_db.py invalidates the cache without touching WordPress.
 			$transient_key = 'acadpush_db_' . md5( wp_json_encode( array(
-				$db->data_version(), $final_keyword, $type_filter, $subtype_filter, $page, $size, $year_from, $year_to,
+				$db->data_version(), $final_keyword, $type_filter, $subtype_filter, $page, $size, $year_from, $year_to, $order,
 			) ) );
 			$cached = get_transient( $transient_key );
 			if ( $cached !== false ) {
@@ -387,7 +405,7 @@ class ACADPUSH_Public {
 				return $cached;
 			}
 
-			$data = $db->query_publications( $page, $size, $final_keyword, $type_filter, $subtype_filter, (int) $year_from, (int) $year_to );
+			$data = $db->query_publications( $page, $size, $final_keyword, $type_filter, $subtype_filter, (int) $year_from, (int) $year_to, $order );
 			$db->close();
 
 			if ( is_wp_error( $data ) ) {
@@ -583,6 +601,66 @@ class ACADPUSH_Public {
 		return array( 0, 0 );
 	}
 
+	/**
+	 * Publications per year and type group, for the group="type" headings.
+	 * Database mode only; the Zenodo API has no such aggregation (returns null).
+	 *
+	 * @return array<string,array<string,int>>|null
+	 */
+	private function retrieve_type_counts( $options, $keyword_override, $type_filter, $subtype_filter, $year_from, $year_to ) {
+		if ( ! isset( $options['choice'] ) || $options['choice'] !== 'database' ) {
+			return null;
+		}
+		$extra_keyword = isset( $options['extra_keyword'] ) ? trim( $options['extra_keyword'] ) : '';
+		$keyword       = ! empty( $keyword_override ) ? $keyword_override : $extra_keyword;
+
+		$db = new ACADPUSH_DB();
+		if ( ! $db->connect( $options ) ) {
+			return null;
+		}
+		$key = 'acadpush_dbt_' . md5( wp_json_encode( array(
+			$db->data_version(), $keyword, $type_filter, $subtype_filter, $year_from, $year_to,
+		) ) );
+		$cached = get_transient( $key );
+		if ( $cached !== false ) {
+			$db->close();
+			return $cached;
+		}
+		$counts = $db->count_by_year_and_type( $keyword, $type_filter, $subtype_filter, (int) $year_from, (int) $year_to );
+		$db->close();
+		if ( is_wp_error( $counts ) ) {
+			return null;
+		}
+		set_transient( $key, $counts, HOUR_IN_SECONDS );
+		return $counts;
+	}
+
+	/** Type group of a record: its Zenodo/DB subtype, mapped onto ACADPUSH_DB::TYPE_GROUP_ORDER. */
+	private function type_group_of( $m ) {
+		$subtype = ( isset( $m->resource_type->subtype ) && is_scalar( $m->resource_type->subtype ) ) ? (string) $m->resource_type->subtype : '';
+		return ACADPUSH_DB::type_group( $subtype );
+	}
+
+	/**
+	 * Zenodo modes: order one page by year (newest first), then type group, keeping
+	 * the API order otherwise. The database already returns this order.
+	 */
+	private function sort_hits_by_type( $hits ) {
+		$rank = array_flip( array_merge( ACADPUSH_DB::TYPE_GROUP_ORDER, array( 'other' ) ) );
+		$keyed = array();
+		foreach ( array_values( $hits ) as $i => $hit ) {
+			$m    = isset( $hit->metadata ) ? $hit->metadata : null;
+			$year = ( $m && ! empty( $m->publication_date ) && preg_match( '/^(\d{4})/', (string) $m->publication_date, $ym ) ) ? (int) $ym[1] : 0;
+			$keyed[] = array( -$year, $m ? $rank[ $this->type_group_of( $m ) ] : 99, $i, $hit );
+		}
+		usort( $keyed, function ( $a, $b ) {
+			return array( $a[0], $a[1], $a[2] ) <=> array( $b[0], $b[1], $b[2] );
+		} );
+		return array_map( function ( $k ) {
+			return $k[3];
+		}, $keyed );
+	}
+
 	private function is_yes( $value ) {
 		return in_array( strtolower( trim( (string) $value ) ), array( '1', 'yes', 'true', 'on' ), true );
 	}
@@ -668,7 +746,11 @@ class ACADPUSH_Public {
 	 * Compact view: one reference per publication in the chosen citation style,
 	 * optionally under year headings.
 	 */
-	private function render_compact_list( $hits, $lang, $group_by_year, $citation = 'simple', $names = 'full', $max_authors = 0 ) {
+	private function render_compact_list( $hits, $lang, $group_by_year, $citation = 'simple', $names = 'full', $max_authors = 0, $group_by_type = false, $type_counts = null ) {
+		if ( $group_by_type ) {
+			$hits = $this->sort_hits_by_type( $hits );
+		}
+		$current_group = null;
 		$formatter    = new ACADPUSH_Citation(
 			array(
 				'volume' => $this->get_label( 'volume', $lang ),
@@ -689,16 +771,27 @@ class ACADPUSH_Public {
 				$year = $ym[1];
 			}
 
-			if ( ! $list_open || ( $group_by_year && $year !== $current_year ) ) {
+			$group      = $group_by_type ? $this->type_group_of( $m ) : '';
+			$new_year   = ! $list_open || ( $group_by_year && $year !== $current_year );
+			$new_group  = $group_by_type && ( $new_year || $group !== $current_group || $year !== $current_year );
+			if ( $new_year || $new_group ) {
 				if ( $list_open ) {
 					$html .= '</ul>';
 				}
-				if ( $group_by_year && $year !== '' ) {
+				if ( $new_year && $group_by_year && $year !== '' ) {
 					$html .= '<h3 class="dyzc-year-heading">' . esc_html( $year ) . '</h3>';
 				}
-				$html        .= '<ul class="dyzc-pub-list">';
-				$list_open    = true;
-				$current_year = $year;
+				if ( $new_group ) {
+					$heading = $this->get_label( 'group_' . $group, $lang );
+					if ( is_array( $type_counts ) && isset( $type_counts[ $year ][ $group ] ) ) {
+						$heading .= ' (' . (int) $type_counts[ $year ][ $group ] . ')';
+					}
+					$html .= '<h4 class="dyzc-type-heading">' . esc_html( $heading ) . '</h4>';
+				}
+				$html         .= '<ul class="dyzc-pub-list">';
+				$list_open     = true;
+				$current_year  = $year;
+				$current_group = $group;
 			}
 
 			$doi_url = '';
@@ -868,6 +961,14 @@ class ACADPUSH_Public {
 				'pages'            => 's.',
 				'citation_style'   => 'Citační styl',
 				'citation_simple'  => 'Jednoduchý',
+				'group_article'         => 'Články v časopisech',
+				'group_conferencepaper' => 'Příspěvky na konferencích',
+				'group_section'         => 'Kapitoly v knihách',
+				'group_book'            => 'Knihy',
+				'group_preprint'        => 'Preprinty',
+				'group_report'          => 'Zprávy',
+				'group_thesis'          => 'Disertační a diplomové práce',
+				'group_other'           => 'Ostatní',
 			),
 			'en' => array(
 				'no_results'       => 'No publications found.',
@@ -887,6 +988,14 @@ class ACADPUSH_Public {
 				'pages'            => 'pp.',
 				'citation_style'   => 'Citation style',
 				'citation_simple'  => 'Simple',
+				'group_article'         => 'Journal articles',
+				'group_conferencepaper' => 'Conference papers',
+				'group_section'         => 'Book chapters',
+				'group_book'            => 'Books',
+				'group_preprint'        => 'Preprints',
+				'group_report'          => 'Reports',
+				'group_thesis'          => 'Theses and dissertations',
+				'group_other'           => 'Other publications',
 			),
 			'pt' => array(
 				'no_results'       => 'Nenhuma publicação encontrada.',
@@ -906,6 +1015,14 @@ class ACADPUSH_Public {
 				'pages'            => 'p.',
 				'citation_style'   => 'Formato',
 				'citation_simple'  => 'Simples',
+				'group_article'         => 'Artigos em periódicos',
+				'group_conferencepaper' => 'Trabalhos completos em anais de eventos',
+				'group_section'         => 'Capítulos de livros',
+				'group_book'            => 'Livros',
+				'group_preprint'        => 'Preprints',
+				'group_report'          => 'Relatórios',
+				'group_thesis'          => 'Teses e dissertações',
+				'group_other'           => 'Outras publicações',
 			),
 		);
 

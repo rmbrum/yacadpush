@@ -47,6 +47,72 @@ class ACADPUSH_DB {
         return implode( '|', array_map( 'strval', $row ) );
     }
 
+    /** Credential field => wp-config.php constant that overrides it. */
+    const CREDENTIAL_CONSTANTS = [
+        'host'     => 'YACADPUSH_DB_HOST',
+        'port'     => 'YACADPUSH_DB_PORT',
+        'name'     => 'YACADPUSH_DB_NAME',
+        'user'     => 'YACADPUSH_DB_USER',
+        'password' => 'YACADPUSH_DB_PASSWORD',
+    ];
+
+    /**
+     * Effective database credentials, in increasing precedence:
+     *   1. the Local Database tab (stored in wp_options);
+     *   2. YACADPUSH_DB_* constants (wp-config.php), field by field;
+     *   3. the `yacadpush_db_credentials` filter, e.g. from a mu-plugin that returns
+     *      per-site values on a multisite network, where wp-config.php is shared.
+     *
+     * The filter receives and returns [host, port, name, user, password] and also gets
+     * the plugin options as a second argument.
+     *
+     * @return array{host:string,port:int,name:string,user:string,password:string,overridden:string[]}
+     *         `overridden` lists the fields not taken from the settings form.
+     */
+    public static function credentials( array $options ): array {
+        $form = [
+            'host'     => isset( $options['db_host'] )     ? trim( (string) $options['db_host'] ) : 'localhost',
+            'port'     => isset( $options['db_port'] )     ? (int) $options['db_port']             : 3306,
+            'name'     => isset( $options['db_name'] )     ? trim( (string) $options['db_name'] ) : '',
+            'user'     => isset( $options['db_user'] )     ? trim( (string) $options['db_user'] ) : '',
+            'password' => isset( $options['db_password'] ) ? (string) $options['db_password']    : '',
+        ];
+
+        $creds = $form;
+        foreach ( self::CREDENTIAL_CONSTANTS as $field => $constant ) {
+            if ( defined( $constant ) ) {
+                $creds[ $field ] = constant( $constant );
+            }
+        }
+        if ( function_exists( 'apply_filters' ) ) {
+            $filtered = apply_filters( 'yacadpush_db_credentials', $creds, $options );
+            if ( is_array( $filtered ) ) {
+                $creds = array_merge( $creds, array_intersect_key( $filtered, $form ) );
+            }
+        }
+
+        $normalize = function ( array $c ): array {
+            return [
+                'host'     => trim( (string) $c['host'] ) !== '' ? trim( (string) $c['host'] ) : 'localhost',
+                'port'     => (int) $c['port'] > 0 ? (int) $c['port'] : 3306,
+                'name'     => trim( (string) $c['name'] ),
+                'user'     => trim( (string) $c['user'] ),
+                'password' => (string) $c['password'],
+            ];
+        };
+        $form  = $normalize( $form );
+        $creds = $normalize( $creds );
+
+        $overridden = [];
+        foreach ( array_keys( $form ) as $field ) {
+            if ( defined( self::CREDENTIAL_CONSTANTS[ $field ] ) || $creds[ $field ] !== $form[ $field ] ) {
+                $overridden[] = $field;
+            }
+        }
+        $creds['overridden'] = $overridden;
+        return $creds;
+    }
+
     /**
      * Abre a conexão com o banco.
      *
@@ -54,11 +120,12 @@ class ACADPUSH_DB {
      * @return bool True se conectou, false caso contrário.
      */
     public function connect( array $options ): bool {
-        $host     = isset( $options['db_host'] )     ? trim( $options['db_host'] )     : 'localhost';
-        $port     = isset( $options['db_port'] )     ? (int) $options['db_port']       : 3306;
-        $dbname   = isset( $options['db_name'] )     ? trim( $options['db_name'] )     : '';
-        $user     = isset( $options['db_user'] )     ? trim( $options['db_user'] )     : '';
-        $password = isset( $options['db_password'] ) ? $options['db_password']         : '';
+        $creds    = self::credentials( $options );
+        $host     = $creds['host'];
+        $port     = $creds['port'];
+        $dbname   = $creds['name'];
+        $user     = $creds['user'];
+        $password = $creds['password'];
 
         if ( empty( $dbname ) || empty( $user ) ) {
             $this->connect_error = 'Database name and user are required.';
@@ -124,7 +191,8 @@ class ACADPUSH_DB {
         string $type_filter = '',
         string $subtype_filter = '',
         int    $year_from   = 0,
-        int    $year_to     = 0
+        int    $year_to     = 0,
+        string $order       = 'date'
     ) {
         if ( ! $this->conn ) {
             return new WP_Error( 'db_not_connected', 'Database connection not established.' );
@@ -136,7 +204,68 @@ class ACADPUSH_DB {
             $keyword, $type_filter, $subtype_filter, $year_from, $year_to
         );
 
-        return $this->fetch_page( $where_sql, $params, $types, $per_page, $offset );
+        return $this->fetch_page( $where_sql, $params, $types, $per_page, $offset, $order );
+    }
+
+    /**
+     * Order of the type groups in the compact view (group="type"); every other
+     * upload type falls into "other", after these.
+     */
+    const TYPE_GROUP_ORDER = [ 'article', 'conferencepaper', 'section', 'book', 'preprint', 'report', 'thesis' ];
+
+    /** Group key of an upload type. */
+    public static function type_group( string $upload_type ): string {
+        return in_array( $upload_type, self::TYPE_GROUP_ORDER, true ) ? $upload_type : 'other';
+    }
+
+    /** SQL rank of p.upload_type in TYPE_GROUP_ORDER (constants only, nothing bound). */
+    private static function type_rank_sql(): string {
+        $sql = 'CASE p.upload_type';
+        foreach ( self::TYPE_GROUP_ORDER as $i => $t ) {
+            $sql .= " WHEN '" . $t . "' THEN " . ( $i + 1 );
+        }
+        return $sql . ' ELSE ' . ( count( self::TYPE_GROUP_ORDER ) + 1 ) . ' END';
+    }
+
+    /**
+     * Number of publications per year and type group, under the given filters.
+     *
+     * @return array<string,array<string,int>>|WP_Error year ('' when unknown) => [group => count].
+     */
+    public function count_by_year_and_type(
+        string $keyword = '',
+        string $type_filter = '',
+        string $subtype_filter = '',
+        int    $year_from = 0,
+        int    $year_to = 0
+    ) {
+        if ( ! $this->conn ) {
+            return new WP_Error( 'db_not_connected', 'Database connection not established.' );
+        }
+
+        list( $where_sql, $params, $types ) = $this->build_where(
+            $keyword, $type_filter, $subtype_filter, $year_from, $year_to
+        );
+
+        $sql  = "SELECT LEFT(p.publication_date, 4) AS y, p.upload_type AS t, COUNT(*) AS n
+                 FROM publications p
+                 WHERE {$where_sql}
+                 GROUP BY y, t";
+        $stmt = $this->conn->prepare( $sql );
+        if ( ! empty( $params ) ) {
+            $stmt->bind_param( $types, ...$params );
+        }
+        $stmt->execute();
+        $res = $stmt->get_result();
+
+        $counts = [];
+        while ( $row = $res->fetch_assoc() ) {
+            $year  = preg_match( '/^\d{4}$/', (string) $row['y'] ) ? (string) $row['y'] : '';
+            $group = self::type_group( (string) $row['t'] );
+            $counts[ $year ][ $group ] = ( $counts[ $year ][ $group ] ?? 0 ) + (int) $row['n'];
+        }
+        $stmt->close();
+        return $counts;
     }
 
     /**
@@ -251,7 +380,13 @@ class ACADPUSH_DB {
      *
      * @return object
      */
-    private function fetch_page( string $where_sql, array $params, string $types, int $per_page, int $offset ) {
+    private function fetch_page( string $where_sql, array $params, string $types, int $per_page, int $offset, string $order = 'date' ) {
+        // group="type" needs each year's publications ordered by type group, so a
+        // page break never interleaves the groups.
+        $order_sql = $order === 'type'
+            ? 'LEFT(p.publication_date, 4) DESC, ' . self::type_rank_sql() . ', p.publication_date DESC, p.id DESC'
+            : 'p.publication_date DESC, p.id DESC';
+
         // --- Contagem total ---
         $count_sql  = "SELECT COUNT(*) FROM publications p WHERE {$where_sql}";
         $count_stmt = $this->conn->prepare( $count_sql );
@@ -285,7 +420,7 @@ class ACADPUSH_DB {
                 p.zenodo_deposit_url
             FROM publications p
             WHERE {$where_sql}
-            ORDER BY p.publication_date DESC, p.id DESC
+            ORDER BY {$order_sql}
             LIMIT ? OFFSET ?
         ";
 
