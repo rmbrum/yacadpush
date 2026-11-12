@@ -187,6 +187,164 @@
 	border-radius: var(--dyzc-radius, 8px);
 }
 
+/* Year selector */
+.dyzc-year-filter {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 20px;
+	color: var(--dyzc-meta, #646970);
+}
+
+.dyzc-year-filter select {
+	font: inherit;
+	padding: 4px 8px;
+	border: 1px solid var(--dyzc-card-border, #dcdcde);
+	border-radius: var(--dyzc-radius, 8px);
+	background: var(--dyzc-card-bg, #fff);
+	color: var(--dyzc-text, #1d2327);
+}
+
+/* Compact view: one reference line per publication */
+.dyzc-view-compact .dyzc-year-heading {
+	margin: 24px 0 8px;
+	padding-bottom: 4px;
+	font-size: 1.15em;
+	color: var(--dyzc-text, #1d2327);
+	border-bottom: 1px solid var(--dyzc-card-border, #dcdcde);
+}
+
+.dyzc-view-compact .dyzc-year-filter + .dyzc-year-heading {
+	margin-top: 0;
+}
+
+.dyzc-view-compact .dyzc-pub-list {
+	list-style: none;
+	margin: 0 0 16px;
+	padding: 0;
+}
+
+.dyzc-view-compact .dyzc-pub-item {
+	margin: 0;
+	padding: 6px 0;
+	line-height: 1.45;
+	color: var(--dyzc-text, #1d2327);
+	border-bottom: 1px dotted var(--dyzc-card-border, #dcdcde);
+}
+
+.dyzc-view-compact .dyzc-pub-item:last-child {
+	border-bottom: 0;
+}
+
+.dyzc-view-compact .dyzc-pub-item .dyzc-pub-authors,
+.dyzc-view-compact .dyzc-pub-item .dyzc-pub-title {
+	display: inline;
+	margin: 0;
+	font-size: inherit;
+}
+
+.dyzc-view-compact .dyzc-pub-item .dyzc-pub-title {
+	font-weight: 600;
+}
+
+.dyzc-view-compact .dyzc-pub-item .dyzc-pub-title a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.dyzc-view-compact .dyzc-pub-item .dyzc-pub-title a:hover {
+	color: var(--dyzc-primary, #2271b1);
+	text-decoration: underline;
+}
+
+.dyzc-view-compact .dyzc-pub-source {
+	color: var(--dyzc-meta, #646970);
+}
+
+.dyzc-view-compact .dyzc-pub-links a {
+	font-size: 0.9em;
+	color: var(--dyzc-primary, #2271b1);
+}
+
+.dyzc-view-compact .dyzc-pub-item {
+	cursor: pointer;
+}
+
+.dyzc-view-compact .dyzc-direct-link {
+	display: inline-block;
+	vertical-align: -1px;
+	color: var(--dyzc-meta, #646970);
+}
+
+.dyzc-view-compact .dyzc-direct-link:hover,
+.dyzc-view-compact .dyzc-direct-link:focus-visible {
+	color: var(--dyzc-primary, #2271b1);
+}
+
+.dyzc-view-compact .dyzc-direct-link svg {
+	display: block;
+}
+
+.dyzc-view-compact .dyzc-pub-item:hover {
+	background: rgba(0, 0, 0, 0.03);
+}
+
+/* Full card in a dialog (compact view) */
+.dyzc-card-dialog {
+	width: min(760px, calc(100vw - 32px));
+	max-height: calc(100vh - 64px);
+	padding: 0;
+	border: 0;
+	border-radius: var(--dyzc-radius, 8px);
+	background: transparent;
+	overflow: visible;
+}
+
+.dyzc-card-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.55);
+}
+
+.dyzc-card-dialog .dyzc-dialog-body {
+	max-height: calc(100vh - 64px);
+	overflow-y: auto;
+	border-radius: var(--dyzc-radius, 8px);
+}
+
+.dyzc-card-dialog .dyzc-pub-card,
+.dyzc-publications-grid .dyzc-card-dialog .dyzc-pub-card {
+	margin: 0 !important;
+	padding-right: 56px;
+	transform: none;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.dyzc-card-dialog .dyzc-pub-card:hover {
+	transform: none;
+}
+
+.dyzc-card-dialog .dyzc-dialog-close {
+	position: absolute;
+	top: 10px;
+	right: 12px;
+	z-index: 1;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	font-size: 26px;
+	line-height: 1;
+	color: var(--dyzc-meta, #646970);
+	background: transparent;
+	border: 0;
+	border-radius: 50%;
+	cursor: pointer;
+}
+
+.dyzc-card-dialog .dyzc-dialog-close:hover,
+.dyzc-card-dialog .dyzc-dialog-close:focus-visible {
+	color: var(--dyzc-text, #1d2327);
+	background: rgba(0, 0, 0, 0.06);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
 	.dyzc-publications-grid {

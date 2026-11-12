@@ -113,6 +113,8 @@ class ACADPUSH_DB {
      * @param string $keyword         Filtro de palavra-chave (opcional).
      * @param string $type_filter     Filtro de upload_type (opcional).
      * @param string $subtype_filter  Filtro de subtype via keyword matching (opcional).
+     * @param int    $year_from       First publication year to include (0 = no lower bound).
+     * @param int    $year_to         Last publication year to include (0 = no upper bound).
      * @return object|WP_Error
      */
     public function query_publications(
@@ -120,7 +122,9 @@ class ACADPUSH_DB {
         int    $per_page    = 10,
         string $keyword     = '',
         string $type_filter = '',
-        string $subtype_filter = ''
+        string $subtype_filter = '',
+        int    $year_from   = 0,
+        int    $year_to     = 0
     ) {
         if ( ! $this->conn ) {
             return new WP_Error( 'db_not_connected', 'Database connection not established.' );
@@ -128,7 +132,25 @@ class ACADPUSH_DB {
 
         $offset = ( max( 1, $page ) - 1 ) * $per_page;
 
-        // --- Construção da query com filtros opcionais ---
+        list( $where_sql, $params, $types ) = $this->build_where(
+            $keyword, $type_filter, $subtype_filter, $year_from, $year_to
+        );
+
+        return $this->fetch_page( $where_sql, $params, $types, $per_page, $offset );
+    }
+
+    /**
+     * WHERE clause shared by the page query and the year list.
+     *
+     * @return array{0:string,1:array,2:string} SQL, bound values, bind_param types.
+     */
+    private function build_where(
+        string $keyword,
+        string $type_filter,
+        string $subtype_filter,
+        int    $year_from,
+        int    $year_to
+    ): array {
         $where_clauses = [ 'p.access_right != "closed"' ];
         $params        = [];
         $types         = '';
@@ -170,8 +192,66 @@ class ACADPUSH_DB {
             }
         }
 
-        $where_sql = implode( ' AND ', $where_clauses );
+        // publication_date is ISO text ('YYYY', 'YYYY-MM' or 'YYYY-MM-DD').
+        if ( $year_from > 0 ) {
+            $where_clauses[] = 'LEFT(p.publication_date, 4) >= ?';
+            $params[]        = sprintf( '%04d', $year_from );
+            $types          .= 's';
+        }
+        if ( $year_to > 0 ) {
+            $where_clauses[] = 'LEFT(p.publication_date, 4) <= ?';
+            $params[]        = sprintf( '%04d', $year_to );
+            $types          .= 's';
+        }
 
+        return [ implode( ' AND ', $where_clauses ), $params, $types ];
+    }
+
+    /**
+     * Publication years present under the given filters, newest first.
+     *
+     * @return array<int,int>|WP_Error Year => number of publications.
+     */
+    public function list_years(
+        string $keyword = '',
+        string $type_filter = '',
+        string $subtype_filter = '',
+        int    $year_from = 0,
+        int    $year_to = 0
+    ) {
+        if ( ! $this->conn ) {
+            return new WP_Error( 'db_not_connected', 'Database connection not established.' );
+        }
+
+        list( $where_sql, $params, $types ) = $this->build_where(
+            $keyword, $type_filter, $subtype_filter, $year_from, $year_to
+        );
+
+        $sql  = "SELECT LEFT(p.publication_date, 4) AS y, COUNT(*) AS n
+                 FROM publications p
+                 WHERE {$where_sql} AND p.publication_date REGEXP '^[0-9]{4}'
+                 GROUP BY y ORDER BY y DESC";
+        $stmt = $this->conn->prepare( $sql );
+        if ( ! empty( $params ) ) {
+            $stmt->bind_param( $types, ...$params );
+        }
+        $stmt->execute();
+        $res = $stmt->get_result();
+
+        $years = [];
+        while ( $row = $res->fetch_assoc() ) {
+            $years[ (int) $row['y'] ] = (int) $row['n'];
+        }
+        $stmt->close();
+        return $years;
+    }
+
+    /**
+     * Run the publications query (already filtered) and shape it like the Zenodo API.
+     *
+     * @return object
+     */
+    private function fetch_page( string $where_sql, array $params, string $types, int $per_page, int $offset ) {
         // --- Contagem total ---
         $count_sql  = "SELECT COUNT(*) FROM publications p WHERE {$where_sql}";
         $count_stmt = $this->conn->prepare( $count_sql );
@@ -197,6 +277,9 @@ class ACADPUSH_DB {
                 p.journal_issue,
                 p.journal_pages,
                 p.conference_title,
+                p.conference_place,
+                p.conference_dates,
+                p.publisher,
                 p.ieee_html_url,
                 p.ieee_pdf_url,
                 p.zenodo_deposit_url
@@ -245,6 +328,13 @@ class ACADPUSH_DB {
                 ],
                 // Atalho direto (usado em alguns templates)
                 'journal_title' => $row['journal_title'] ?? '',
+                // Zenodo's `meeting` block (conference papers).
+                'meeting'   => (object) [
+                    'title' => $row['conference_title'] ?? '',
+                    'place' => $row['conference_place'] ?? '',
+                    'dates' => $row['conference_dates'] ?? '',
+                ],
+                'publisher' => $row['publisher'] ?? '',
             ];
 
             // Monta links
@@ -348,6 +438,8 @@ class ACADPUSH_DB {
             'article'          => 'Journal Article',
             'conferencepaper'  => 'Conference Paper',
             'book'             => 'Book',
+            'section'          => 'Book Section',
+            'preprint'         => 'Preprint',
             'report'           => 'Report',
             'thesis'           => 'Thesis',
             'dataset'          => 'Dataset',
@@ -360,6 +452,7 @@ class ACADPUSH_DB {
                 'conferencepaper'  => 'Artigo em evento',
                 'book'             => 'Livro',
                 'section'          => 'Capítulo de livro',
+                'preprint'         => 'Preprint',
                 'report'           => 'Relatório',
                 'thesis'           => 'Tese ou dissertação',
                 'dataset'          => 'Conjunto de dados',

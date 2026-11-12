@@ -463,7 +463,22 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 						<tr>
 							<td><code>lang</code></td>
 							<td>Set the display language for labels and date formatting.</td>
-							<td><code>'en'</code> (English), <code>'cs'</code> (Czech)</td>
+							<td><code>'en'</code> (English), <code>'cs'</code> (Czech), <code>'pt'</code> (Portuguese)</td>
+						</tr>
+						<tr>
+							<td><code>view</code></td>
+							<td>Layout: <code>cards</code> (default) or <code>compact</code>, one reference line per publication grouped under year headings.</td>
+							<td><code>'compact'</code></td>
+						</tr>
+						<tr>
+							<td><code>year</code></td>
+							<td>Only publications from this year or range of years (either end may be left open).</td>
+							<td><code>'2024'</code>, <code>'2015-2020'</code>, <code>'2010-'</code></td>
+						</tr>
+						<tr>
+							<td><code>year_filter</code></td>
+							<td>Show a year selector above the list. In database mode it lists the years present, with counts; in Zenodo modes it lists every year from the oldest deposited record to the current year.</td>
+							<td><code>'yes'</code></td>
 						</tr>
 					</tbody>
 				</table>
@@ -512,7 +527,15 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 				</div>
 
 				<div class="dyzc-example">
-					<h4>Example 6: Multiple pages with different filters</h4>
+					<h4>Example 6: Compact list with a year selector</h4>
+					<div class="dyzc-code-block">
+						<code>[showcase-publications view='compact' year_filter='yes']</code>
+					</div>
+					<p class="description">One line per publication (authors, title, venue, year), grouped by year, with a selector to show a single year. Clicking a line opens the full card with the whole abstract; the icon next to the title opens the publication itself.</p>
+				</div>
+
+				<div class="dyzc-example">
+					<h4>Example 7: Multiple pages with different filters</h4>
 					<p>You can use different keywords on different pages of your site:</p>
 					<ul style="list-style: disc; margin-left: 20px;">
 						<li><strong>Publications page:</strong> <code>[showcase-publications]</code></li>

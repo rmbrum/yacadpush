@@ -4,7 +4,7 @@ Tags: zenodo, publications, orcid, academic, research
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -101,6 +101,17 @@ Combine filters (AI-related conference papers only).
 `[showcase-publications lang='en']`
 
 Force display in English (default auto-detects from WordPress locale).
+
+`[showcase-publications view='compact' year_filter='yes']`
+
+Compact list: one reference line per publication (authors, title, venue, year), grouped under year
+headings, with a year selector above it. Clicking a line opens the full card (whole abstract)
+in a dialog; the icon next to the title opens the publication itself. In database mode the selector lists the years present, with
+counts; in Zenodo modes it lists every year from the oldest deposited record to the current year.
+
+`[showcase-publications year='2015-2020']`
+
+Only publications from a year (`2024`) or a range of years (`2015-2020`, `2010-`).
 
 **Available Type Values:**
 
