@@ -17,7 +17,7 @@
  * Plugin Name:       YACADPUSH: Yet Another Academic Publication Showcase
  * Plugin URI:        https://github.com/rmbrum/yacadpush
  * Description:       Display publications from Zenodo communities, ORCID author profiles or a local MySQL database. Fork of Academic Publications Showcase by Martin Haváček, based on Display Your Zenodo Community by DARIAH-EU.
- * Version:           2.1.0
+ * Version:           2.2.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Raphael Brum; Martin Haváček (original)
@@ -44,7 +44,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 define( 'ACADPUSH_ROOT', dirname( __FILE__ ) );
-define( 'YACADPUSH_VERSION', '2.1.0' );
+define( 'YACADPUSH_VERSION', '2.2.0' );
 
 /**
  * The code that runs during plugin activation.

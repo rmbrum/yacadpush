@@ -187,16 +187,24 @@
 	border-radius: var(--dyzc-radius, 8px);
 }
 
-/* Year selector */
-.dyzc-year-filter {
+/* Toolbar: year and citation style selectors */
+.dyzc-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 28px;
+	margin: 0 0 20px;
+}
+
+.dyzc-select-form {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	margin: 0 0 20px;
+	margin: 0;
 	color: var(--dyzc-meta, #646970);
 }
 
-.dyzc-year-filter select {
+.dyzc-select-form select {
 	font: inherit;
 	padding: 4px 8px;
 	border: 1px solid var(--dyzc-card-border, #dcdcde);
@@ -214,7 +222,7 @@
 	border-bottom: 1px solid var(--dyzc-card-border, #dcdcde);
 }
 
-.dyzc-view-compact .dyzc-year-filter + .dyzc-year-heading {
+.dyzc-view-compact .dyzc-toolbar + .dyzc-year-heading {
 	margin-top: 0;
 }
 
@@ -259,6 +267,26 @@
 
 .dyzc-view-compact .dyzc-pub-source {
 	color: var(--dyzc-meta, #646970);
+}
+
+/* Citation styles: the title keeps its link colour but not the "simple" style's weight */
+.dyzc-view-compact .dyzc-pub-item:not(.dyzc-cite-simple) .dyzc-pub-title {
+	font-weight: inherit;
+}
+
+.dyzc-view-compact .dyzc-citation strong .dyzc-pub-title,
+.dyzc-view-compact .dyzc-citation em .dyzc-pub-title {
+	font-weight: inherit;
+	font-style: inherit;
+}
+
+.dyzc-view-compact .dyzc-citation .dyzc-author {
+	display: inline;
+}
+
+.dyzc-view-compact .dyzc-citation .dyzc-doi {
+	color: var(--dyzc-primary, #2271b1);
+	overflow-wrap: anywhere;
 }
 
 .dyzc-view-compact .dyzc-pub-links a {

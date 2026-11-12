@@ -81,10 +81,10 @@
 			$(dialog).find('.dyzc-dialog-close').trigger('focus');
 		});
 
-		// Year selector: reload the list for the chosen year
-		$('.dyzc-year-select').on('change', function() {
+		// Year and citation style selectors: reload the list with the new choice
+		$('.dyzc-auto-submit').on('change', function() {
 			if (!this.value) {
-				// "All years": leave pub_year out of the URL
+				// "All years": leave the empty argument out of the URL
 				if (!this.form.querySelector('input[type="hidden"]')) {
 					window.location.href = this.form.action;
 					return;

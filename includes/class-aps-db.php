@@ -316,6 +316,7 @@ class ACADPUSH_DB {
                 'publication_date' => $row['publication_date'],
                 'resource_type'    => (object) [
                     'title' => $this->upload_type_label( $row['upload_type'] ),
+                    'subtype' => $row['upload_type'], // read by the citation styles
                 ],
                 'creators'  => $authors,
                 'keywords'  => $keywords,

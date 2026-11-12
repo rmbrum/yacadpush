@@ -102,6 +102,7 @@ class ACADPUSH_Public {
 	public function zp_query_vars( $query_vars ) {
 		$query_vars[] = 'zenodo_page';
 		$query_vars[] = 'pub_year'; // year chosen in the year selector ("year" is reserved by WordPress)
+		$query_vars[] = 'pub_cite'; // citation style chosen in the style selector (compact view)
 		return $query_vars;
 	}
 
@@ -113,13 +114,33 @@ class ACADPUSH_Public {
 			'subtype' => '',   // Specific subtype: article, book, conferencepaper, etc.
 			'view' => '',      // cards (default) | compact
 			'year' => '',      // fixed year "2024" or range "2015-2020"
-			'year_filter' => '' // "yes" shows a year selector above the list
+			'year_filter' => '', // "yes" shows a year selector above the list
+			'citation' => '',  // compact view: simple (default) | abnt | apa | ieee | vancouver | chicago
+			'names' => '',     // full (default) | initials; ABNT, Chicago and simple only
+			'max_authors' => '', // compact view: list N authors, then "et al." (default: the style's rule)
+			'citation_select' => '' // "yes" lets the visitor pick the citation style
 		), $attr, 'showcase-publications' );
 
 		$view = strtolower( trim( $attr['view'] ) ) === 'compact' ? 'compact' : 'cards';
 
 		list( $range_from, $range_to ) = $this->parse_year_range( $attr['year'] );
-		$show_year_filter = in_array( strtolower( trim( $attr['year_filter'] ) ), array( '1', 'yes', 'true', 'on' ), true );
+		$show_year_filter = $this->is_yes( $attr['year_filter'] );
+
+		// Citation style of the compact view: the shortcode's choice, or the visitor's
+		// when the style selector is shown.
+		$citation = strtolower( trim( $attr['citation'] ) );
+		if ( ! ACADPUSH_Citation::is_style( $citation ) ) {
+			$citation = 'simple';
+		}
+		$show_citation_select = $view === 'compact' && $this->is_yes( $attr['citation_select'] );
+		if ( $show_citation_select ) {
+			$requested_style = strtolower( (string) get_query_var( 'pub_cite', '' ) );
+			if ( ACADPUSH_Citation::is_style( $requested_style ) ) {
+				$citation = $requested_style;
+			}
+		}
+		$names       = strtolower( trim( $attr['names'] ) ) === 'initials' ? 'initials' : 'full';
+		$max_authors = max( 0, (int) $attr['max_authors'] );
 
 		// The selector's choice only applies to shortcodes that show the selector,
 		// and only inside the range the shortcode allows.
@@ -193,8 +214,14 @@ class ACADPUSH_Public {
 		if ( $show_year_filter ) {
 			$years = $this->retrieve_years( $options, $shortcode_specific_keyword, $shortcode_specific_type, $shortcode_specific_subtype, $range_from, $range_to );
 			if ( ! is_wp_error( $years ) && ! empty( $years ) ) {
-				$toolbar = $this->render_year_filter( $years, $selected_year, $lang );
+				$toolbar .= $this->render_year_filter( $years, $selected_year, $lang );
 			}
+		}
+		if ( $show_citation_select ) {
+			$toolbar .= $this->render_citation_select( $citation, $lang );
+		}
+		if ( $toolbar !== '' ) {
+			$toolbar = '<div class="dyzc-toolbar">' . $toolbar . '</div>';
 		}
 
 		if ( is_wp_error( $api_response ) ) {
@@ -217,7 +244,7 @@ class ACADPUSH_Public {
 		if ( $view === 'compact' ) {
 			// Year headings only help when the list spans more than one year.
 			$group_by_year = ! ( $year_from && $year_from === $year_to );
-			$html .= $this->render_compact_list( $api_response->hits->hits, $lang, $group_by_year );
+			$html .= $this->render_compact_list( $api_response->hits->hits, $lang, $group_by_year, $citation, $names, $max_authors );
 			$html .= $this->render_pagination( $page, $nb_pages, $lang );
 			// One dialog per list; the script fills it with the clicked item's card.
 			$html .= '<dialog class="dyzc-card-dialog" aria-label="' . esc_attr( $this->get_label( 'view_publication', $lang ) ) . '">'
@@ -556,15 +583,62 @@ class ACADPUSH_Public {
 		return array( 0, 0 );
 	}
 
+	private function is_yes( $value ) {
+		return in_array( strtolower( trim( (string) $value ) ), array( '1', 'yes', 'true', 'on' ), true );
+	}
+
 	/**
-	 * Year selector: a GET form that keeps the page's other query arguments.
+	 * Year selector. Choosing a year goes back to the first page.
 	 */
 	private function render_year_filter( $years, $selected_year, $lang ) {
+		$options = array( '' => $this->get_label( 'all_years', $lang ) );
+		foreach ( $years as $year => $count ) {
+			$options[ (string) $year ] = $count === null ? (string) $year : $year . ' (' . (int) $count . ')';
+		}
+		return $this->render_select_form(
+			'pub_year',
+			array( 'pub_year', 'zenodo_page' ),
+			$this->get_label( 'year', $lang ),
+			$options,
+			$selected_year ? (string) $selected_year : '',
+			'dyzc-year-filter',
+			$lang
+		);
+	}
+
+	/**
+	 * Citation style selector (compact view). The page number is kept.
+	 */
+	private function render_citation_select( $citation, $lang ) {
+		$options = array();
+		foreach ( ACADPUSH_Citation::STYLES as $key => $name ) {
+			$options[ $key ] = $key === 'simple' ? $this->get_label( 'citation_simple', $lang ) : $name;
+		}
+		return $this->render_select_form(
+			'pub_cite',
+			array( 'pub_cite' ),
+			$this->get_label( 'citation_style', $lang ),
+			$options,
+			$citation,
+			'dyzc-citation-filter',
+			$lang
+		);
+	}
+
+	/**
+	 * A GET form with one select that keeps the page's other query arguments.
+	 * The script submits it on change; <noscript> keeps a button.
+	 *
+	 * @param string   $param   Query argument the select sets.
+	 * @param string[] $drop    Query arguments left out of the hidden inputs.
+	 * @param array    $options value => label.
+	 */
+	private function render_select_form( $param, $drop, $label, $options, $selected, $class, $lang ) {
 		static $instance = 0;
 		$instance++;
-		$select_id = 'dyzc-year-' . $instance;
+		$select_id = 'dyzc-select-' . $instance;
 
-		$current = remove_query_arg( array( 'pub_year', 'zenodo_page' ) );
+		$current = remove_query_arg( $drop );
 		$parts   = wp_parse_url( $current );
 		$action  = isset( $parts['path'] ) ? $parts['path'] : '';
 		$hidden  = '';
@@ -577,14 +651,12 @@ class ACADPUSH_Public {
 			}
 		}
 
-		$html  = '<form class="dyzc-year-filter" method="get" action="' . esc_url( $action ) . '">';
+		$html  = '<form class="dyzc-select-form ' . esc_attr( $class ) . '" method="get" action="' . esc_url( $action ) . '">';
 		$html .= $hidden;
-		$html .= '<label for="' . esc_attr( $select_id ) . '">' . esc_html( $this->get_label( 'year', $lang ) ) . '</label> ';
-		$html .= '<select id="' . esc_attr( $select_id ) . '" name="pub_year" class="dyzc-year-select">';
-		$html .= '<option value="">' . esc_html( $this->get_label( 'all_years', $lang ) ) . '</option>';
-		foreach ( $years as $year => $count ) {
-			$label = $count === null ? (string) $year : $year . ' (' . (int) $count . ')';
-			$html .= '<option value="' . esc_attr( $year ) . '"' . selected( (int) $year, (int) $selected_year, false ) . '>' . esc_html( $label ) . '</option>';
+		$html .= '<label for="' . esc_attr( $select_id ) . '">' . esc_html( $label ) . '</label> ';
+		$html .= '<select id="' . esc_attr( $select_id ) . '" name="' . esc_attr( $param ) . '" class="dyzc-auto-submit">';
+		foreach ( $options as $value => $text ) {
+			$html .= '<option value="' . esc_attr( $value ) . '"' . selected( (string) $value, (string) $selected, false ) . '>' . esc_html( $text ) . '</option>';
 		}
 		$html .= '</select> ';
 		$html .= '<noscript><button type="submit" class="dyzc-btn dyzc-btn-secondary">' . esc_html( $this->get_label( 'filter', $lang ) ) . '</button></noscript>';
@@ -593,9 +665,17 @@ class ACADPUSH_Public {
 	}
 
 	/**
-	 * Compact view: one reference line per publication, optionally under year headings.
+	 * Compact view: one reference per publication in the chosen citation style,
+	 * optionally under year headings.
 	 */
-	private function render_compact_list( $hits, $lang, $group_by_year ) {
+	private function render_compact_list( $hits, $lang, $group_by_year, $citation = 'simple', $names = 'full', $max_authors = 0 ) {
+		$formatter    = new ACADPUSH_Citation(
+			array(
+				'volume' => $this->get_label( 'volume', $lang ),
+				'issue'  => $this->get_label( 'issue', $lang ),
+				'pages'  => $this->get_label( 'pages', $lang ),
+			)
+		);
 		$html         = '';
 		$current_year = null;
 		$list_open    = false;
@@ -628,47 +708,31 @@ class ACADPUSH_Public {
 				$doi_url = 'https://doi.org/' . $hit->doi;
 			}
 
-			$html .= '<li class="dyzc-pub-item">';
-			if ( ! empty( $m->creators ) ) {
-				$authors = $this->render_authors( $m->creators );
-				// "Silva, A." and "et al." already end with a period.
-				$end     = substr( rtrim( wp_strip_all_tags( $authors ) ), -1 ) === '.' ? ' ' : '. ';
-				$html   .= '<span class="dyzc-pub-authors">' . $authors . '</span>' . $end;
+			$bare_doi = '';
+			if ( ! empty( $hit->doi ) ) {
+				$bare_doi = (string) $hit->doi;
+			} elseif ( $doi_url && preg_match( '#doi\.org/(.+)$#i', $doi_url, $dm ) ) {
+				$bare_doi = rawurldecode( $dm[1] );
 			}
 
 			// The title opens the full card in a dialog (see aps-public.js); without
 			// JavaScript it is a plain link to the DOI.
 			$title = esc_html( rtrim( (string) $m->title, '. ' ) );
-			$title = '<a href="' . esc_url( $doi_url ? $doi_url : '#' ) . '" class="dyzc-open-card"'
-				. ( $doi_url ? ' target="_blank" rel="noopener"' : '' ) . '>' . $title . '</a>';
-			$html .= '<span class="dyzc-pub-title">' . $title . '</span>';
-			// Icon next to the title: straight to the publication (DOI), new tab.
+			$title = '<span class="dyzc-pub-title"><a href="' . esc_url( $doi_url ? $doi_url : '#' ) . '" class="dyzc-open-card"'
+				. ( $doi_url ? ' target="_blank" rel="noopener"' : '' ) . '>' . $title . '</a></span>';
+			// Icon after the title: straight to the publication (DOI), new tab.
+			$icon = '';
 			if ( $doi_url ) {
 				$label = $this->get_label( 'view_publication', $lang );
-				$html .= ' <a href="' . esc_url( $doi_url ) . '" class="dyzc-direct-link" target="_blank" rel="noopener"'
+				$icon  = ' <a href="' . esc_url( $doi_url ) . '" class="dyzc-direct-link" target="_blank" rel="noopener"'
 					. ' title="' . esc_attr( $label ) . '" aria-label="' . esc_attr( $label ) . '">'
 					. '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
 					. '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
 					. ' d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>';
 			}
-			$html .= '. ';
 
-			$source = array();
-			$venue  = $this->venue_name( $m );
-			if ( $venue ) {
-				$source[] = '<em class="dyzc-pub-venue">' . esc_html( $venue ) . '</em>';
-			} elseif ( ! empty( $m->resource_type->title ) ) {
-				$source[] = esc_html( $m->resource_type->title );
-			}
-			foreach ( $this->venue_details( $m, $lang ) as $detail ) {
-				$source[] = esc_html( $detail );
-			}
-			if ( $year !== '' ) {
-				$source[] = esc_html( $year );
-			}
-			if ( ! empty( $source ) ) {
-				$html .= '<span class="dyzc-pub-source">' . implode( ', ', $source ) . '</span>.';
-			}
+			$html .= '<li class="dyzc-pub-item dyzc-cite-' . esc_attr( $citation ) . '">';
+			$html .= '<span class="dyzc-citation">' . $formatter->format( $m, $bare_doi, $title, $icon, $citation, $names, $max_authors ) . '</span>';
 
 			$links = array();
 			if ( ! empty( $hit->links->pdf ) ) {
@@ -737,28 +801,6 @@ class ACADPUSH_Public {
 		return '';
 	}
 
-	/**
-	 * Volume, issue and pages of a journal article, in the page language.
-	 *
-	 * @return string[]
-	 */
-	private function venue_details( $m, $lang ) {
-		if ( empty( $m->journal ) || ! is_object( $m->journal ) ) {
-			return array();
-		}
-		$details = array();
-		if ( ! empty( $m->journal->volume ) ) {
-			$details[] = $this->get_label( 'volume', $lang ) . ' ' . $m->journal->volume;
-		}
-		if ( ! empty( $m->journal->issue ) ) {
-			$details[] = $this->get_label( 'issue', $lang ) . ' ' . $m->journal->issue;
-		}
-		if ( ! empty( $m->journal->pages ) ) {
-			$details[] = $this->get_label( 'pages', $lang ) . ' ' . $m->journal->pages;
-		}
-		return $details;
-	}
-
 	private function render_pagination($page, $nb_pages, $lang) {
 		if ($nb_pages <= 1) return '';
 
@@ -824,6 +866,8 @@ class ACADPUSH_Public {
 				'volume'           => 'roč.',
 				'issue'            => 'č.',
 				'pages'            => 's.',
+				'citation_style'   => 'Citační styl',
+				'citation_simple'  => 'Jednoduchý',
 			),
 			'en' => array(
 				'no_results'       => 'No publications found.',
@@ -841,6 +885,8 @@ class ACADPUSH_Public {
 				'volume'           => 'vol.',
 				'issue'            => 'no.',
 				'pages'            => 'pp.',
+				'citation_style'   => 'Citation style',
+				'citation_simple'  => 'Simple',
 			),
 			'pt' => array(
 				'no_results'       => 'Nenhuma publicação encontrada.',
@@ -858,6 +904,8 @@ class ACADPUSH_Public {
 				'volume'           => 'v.',
 				'issue'            => 'n.',
 				'pages'            => 'p.',
+				'citation_style'   => 'Formato',
+				'citation_simple'  => 'Simples',
 			),
 		);
 

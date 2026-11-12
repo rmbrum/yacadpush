@@ -480,6 +480,26 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 							<td>Show a year selector above the list. In database mode it lists the years present, with counts; in Zenodo modes it lists every year from the oldest deposited record to the current year.</td>
 							<td><code>'yes'</code></td>
 						</tr>
+						<tr>
+							<td><code>citation</code></td>
+							<td>Citation style of the compact view: <code>simple</code> (default), <code>abnt</code> (NBR 6023:2018), <code>apa</code> (7th), <code>ieee</code>, <code>vancouver</code>, <code>chicago</code> (author-date).</td>
+							<td><code>'abnt'</code></td>
+						</tr>
+						<tr>
+							<td><code>names</code></td>
+							<td>Given names in full (<code>full</code>, default) or as initials (<code>initials</code>). Applies to ABNT, Chicago and simple; APA, IEEE and Vancouver always use initials.</td>
+							<td><code>'initials'</code></td>
+						</tr>
+						<tr>
+							<td><code>max_authors</code></td>
+							<td>List this many authors, then "et al.", instead of the style's own rule.</td>
+							<td><code>'3'</code></td>
+						</tr>
+						<tr>
+							<td><code>citation_select</code></td>
+							<td>Show a selector so the visitor can switch the citation style (compact view).</td>
+							<td><code>'yes'</code></td>
+						</tr>
 					</tbody>
 				</table>
 			</div>
@@ -535,7 +555,15 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 				</div>
 
 				<div class="dyzc-example">
-					<h4>Example 7: Multiple pages with different filters</h4>
+					<h4>Example 7: ABNT references with abbreviated names</h4>
+					<div class="dyzc-code-block">
+						<code>[showcase-publications view='compact' citation='abnt' names='initials' citation_select='yes']</code>
+					</div>
+					<p class="description">Compact list in ABNT NBR 6023:2018 ("SILVA, J. C."), with a selector for the other styles.</p>
+				</div>
+
+				<div class="dyzc-example">
+					<h4>Example 8: Multiple pages with different filters</h4>
 					<p>You can use different keywords on different pages of your site:</p>
 					<ul style="list-style: disc; margin-left: 20px;">
 						<li><strong>Publications page:</strong> <code>[showcase-publications]</code></li>

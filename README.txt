@@ -4,7 +4,7 @@ Tags: zenodo, publications, orcid, academic, research
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -112,6 +112,28 @@ counts; in Zenodo modes it lists every year from the oldest deposited record to 
 `[showcase-publications year='2015-2020']`
 
 Only publications from a year (`2024`) or a range of years (`2015-2020`, `2010-`).
+
+`[showcase-publications view='compact' citation='abnt' names='initials' citation_select='yes']`
+
+Citation style of the compact list. `citation` is one of:
+
+- `simple` (default): authors, title, venue, volume/issue/pages, year; five authors, then "et al.";
+- `abnt` (ABNT NBR 6023:2018): every author;
+- `apa` (APA 7th): up to 20 authors, then the first 19, ". . ." and the last;
+- `ieee`: up to six authors, then the first author and "et al.";
+- `vancouver` (NLM/ICMJE): up to six authors, then "et al.";
+- `chicago` (Chicago author-date, 17th): up to ten authors, then the first seven and "et al.".
+
+`names='initials'` abbreviates given names ("SILVA, J. C."). It applies to `abnt`, `chicago` and `simple`;
+`apa`, `ieee` and `vancouver` always use initials, as their rules require. `max_authors='3'` overrides
+the style's author rule: three authors, then "et al.". `citation_select='yes'` shows a selector so the
+visitor can switch styles (query argument `pub_cite`).
+
+Name handling: names are read as stored ("Family, Given"). Names without a comma are read as
+"Given Family". In ABNT, a Portuguese or Spanish particle that starts the family name moves after
+the given names ("de Moura, Rafael" becomes "MOURA, Rafael de"), and particles stay in abbreviated
+names ("RAMOS, E. de A."). The other styles leave particles out of the initials. Titles are printed
+as stored: there is no conversion to sentence case or title case, and journal names are not abbreviated.
 
 **Available Type Values:**
 

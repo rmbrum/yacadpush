@@ -56,7 +56,7 @@ class ACADPUSH {
 		if ( defined( 'YACADPUSH_VERSION' ) ) {
 			$this->version = YACADPUSH_VERSION;
 		} else {
-			$this->version = '2.1.0';
+			$this->version = '2.2.0';
 		}
 		$this->plugin_name = 'yacadpush';
 		$this->load_dependencies();
@@ -76,6 +76,7 @@ class ACADPUSH {
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-aps-i18n.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-aps-db.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-aps-admin.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-aps-citation.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-aps-public.php';
 		$this->loader = new ACADPUSH_Loader();
 	}

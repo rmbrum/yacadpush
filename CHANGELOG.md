@@ -1,3 +1,20 @@
+## [2.2.0] - 2026-11-12
+
+### Added
+- Citation styles for the compact view: `citation="abnt|apa|ieee|vancouver|chicago"` (default
+  `simple`, the 2.1.0 line). Each style follows its own author-list rule and punctuation, and
+  shows the DOI. Formatting lives in `public/class-aps-citation.php` (`ACADPUSH_Citation`).
+- `names="initials"` abbreviates given names in ABNT, Chicago and simple (APA, IEEE and
+  Vancouver always abbreviate). In ABNT, a Portuguese or Spanish particle that starts the family
+  name moves after the given names, and particles stay in abbreviated names.
+- `max_authors="N"` overrides the style's author-list rule.
+- `citation_select="yes"`: a style selector next to the year selector (query argument `pub_cite`).
+
+### Changed
+- In database mode, `resource_type` now carries `subtype` (the upload type), as Zenodo does.
+- The compact line reads names without a comma as "Given Family" and prints them inverted.
+- The year selector and the new style selector share one form helper and the `dyzc-toolbar` wrapper.
+
 ## [2.1.0] - 2026-11-11
 
 ### Added
