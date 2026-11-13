@@ -3,7 +3,7 @@
  * Reference formatting for the compact view.
  *
  * Takes a record shaped like the Zenodo REST API (as returned by the Zenodo modes and by
- * ACADPUSH_DB) and builds one reference in a citation style: ABNT (NBR 6023:2018), APA 7th,
+ * ACADPUSH_DB) and builds one reference in a citation style: ABNT (NBR 6023:2025), APA 7th,
  * IEEE, Vancouver (NLM/ICMJE) or Chicago author-date (17th), plus "simple", the plugin's own
  * short form.
  *
@@ -49,6 +49,9 @@ class ACADPUSH_Citation {
 
 	/** @var array Surnames ABNT keeps whole, as name_key() => true. */
 	private $compound = array();
+
+	/** @var bool ABNT with initials: write the particles (da, de, dos...) instead of leaving them out. */
+	private $keep_particles = false;
 
 	/**
 	 * @param array $labels   volume, issue and pages labels for "simple".
@@ -98,13 +101,16 @@ class ACADPUSH_Citation {
 	 * @param string $style       Key of self::STYLES.
 	 * @param string $names       "full" or "initials"; only ABNT, Chicago and simple honour "full".
 	 * @param int    $max_authors 0 = the style's own rule; N = first N, then "et al.".
+	 * @param string $particles   ABNT with initials: "hide" (default) leaves out da, de, dos...
+	 *                            ("AZAMBUJA, J. R. F."); "keep" writes them ("AZAMBUJA, J. R. F. de").
 	 */
-	public function format( $m, $doi, $title_html, $after_title, $style, $names = 'full', $max_authors = 0 ) {
+	public function format( $m, $doi, $title_html, $after_title, $style, $names = 'full', $max_authors = 0, $particles = 'hide' ) {
 		$r = $this->normalize( $m, $doi );
 		$r['title_html']  = $title_html;
 		$r['after_title'] = $after_title;
 		$r['initials']    = ( $names === 'initials' );
 		$r['max_authors'] = max( 0, (int) $max_authors );
+		$this->keep_particles = ( $particles === 'keep' );
 
 		switch ( $style ) {
 			case 'abnt':
@@ -299,8 +305,13 @@ class ACADPUSH_Citation {
 			case 'abnt':       // SILVA, João Carlos | SILVA, J. C.
 				// Entry by the last surname (NBR 6023): "Furlanetto de Azambuja, José Rodrigo"
 				// -> "AZAMBUJA, José Rodrigo Furlanetto de" | "AZAMBUJA, J. R. F. de".
+				// With initials the particles are left out unless particles="keep": "AZAMBUJA, J. R. F.".
 				list( $entry, $rest, $particles ) = $this->abnt_split( $family, $given );
-				$after = $this->join( array( $initials ? $this->initials( $rest, false, true ) : $rest, $particles ), ' ' );
+				if ( $initials && ! $this->keep_particles ) {
+					$after = $this->initials( $rest );
+				} else {
+					$after = $this->join( array( $initials ? $this->initials( $rest, false, true ) : $rest, $particles ), ' ' );
+				}
 				$text  = $this->upper( $entry ) . ( $after !== '' ? ', ' . $after : '' );
 				break;
 			case 'inverted':   // Silva, João Carlos | Silva, J. C.
@@ -516,10 +527,10 @@ class ACADPUSH_Citation {
 	/* ------------------------------------------------------------------ */
 
 	/**
-	 * ABNT NBR 6023:2018. Authors in full by default (names="initials" abbreviates them); every
+	 * ABNT NBR 6023:2025. Authors in full by default (names="initials" abbreviates them); every
 	 * author is listed (the norm recommends it; max_authors gives "first N et al.").
-	 * Unknown place of publication is "[S. l.]". The proceedings title is not stored, so
-	 * conference papers use "Anais [...]".
+	 * Unknown place of publication is "[S. l.]", and "[S. l.: s. n.]" when the publisher is unknown
+	 * too (8.5.6). The proceedings title is not stored, so conference papers use "Anais [...]".
 	 */
 	private function abnt( array $r ) {
 		$e   = 'esc_html';
@@ -531,7 +542,7 @@ class ACADPUSH_Citation {
 		}
 
 		$pages = $r['pages'] !== '' ? 'p. ' . $e( $this->pages( $r['pages'], '-' ) ) : '';
-		$imprint = $this->join( array( '[S. l.]: ' . $e( $r['publisher'] !== '' ? $r['publisher'] : '[s. n.]' ), $e( $r['year'] ) ), ', ' );
+		$imprint = $this->join( array( $r['publisher'] !== '' ? '[S. l.]: ' . $e( $r['publisher'] ) : '[S. l.: s. n.]', $e( $r['year'] ) ), ', ' );
 
 		switch ( $r['kind'] ) {
 			case 'article':

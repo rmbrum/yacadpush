@@ -118,6 +118,7 @@ class ACADPUSH_Public {
 			'citation' => '',  // compact view: simple (default) | abnt | apa | ieee | vancouver | chicago
 			'names' => '',     // full (default) | initials; ABNT, Chicago and simple only
 			'max_authors' => '', // compact view: list N authors, then "et al." (default: the style's rule)
+			'particles' => '', // ABNT with initials: hide (default) | keep da, de, dos...
 			'citation_select' => '', // "yes" lets the visitor pick the citation style
 			'per_page' => '',  // publications per page for this shortcode (default: the API Settings value)
 			'group' => ''      // compact view: "type" adds type sub-headings inside each year
@@ -145,6 +146,7 @@ class ACADPUSH_Public {
 		}
 		$names       = strtolower( trim( $attr['names'] ) ) === 'initials' ? 'initials' : 'full';
 		$max_authors = max( 0, (int) $attr['max_authors'] );
+		$particles   = strtolower( trim( $attr['particles'] ) ) === 'keep' ? 'keep' : 'hide';
 
 		// The selector's choice only applies to shortcodes that show the selector,
 		// and only inside the range the shortcode allows.
@@ -252,7 +254,7 @@ class ACADPUSH_Public {
 			if ( $group_by_type ) {
 				$type_counts = $this->retrieve_type_counts( $options, $shortcode_specific_keyword, $shortcode_specific_type, $shortcode_specific_subtype, $year_from, $year_to );
 			}
-			$html .= $this->render_compact_list( $api_response->hits->hits, $lang, $group_by_year, $citation, $names, $max_authors, $group_by_type, $type_counts );
+			$html .= $this->render_compact_list( $api_response->hits->hits, $lang, $group_by_year, $citation, $names, $max_authors, $group_by_type, $type_counts, $particles );
 			$html .= $this->render_pagination( $page, $nb_pages, $lang );
 			// One dialog per list; the script fills it with the clicked item's card.
 			$html .= '<dialog class="dyzc-card-dialog" aria-label="' . esc_attr( $this->get_label( 'view_publication', $lang ) ) . '">'
@@ -746,7 +748,7 @@ class ACADPUSH_Public {
 	 * Compact view: one reference per publication in the chosen citation style,
 	 * optionally under year headings.
 	 */
-	private function render_compact_list( $hits, $lang, $group_by_year, $citation = 'simple', $names = 'full', $max_authors = 0, $group_by_type = false, $type_counts = null ) {
+	private function render_compact_list( $hits, $lang, $group_by_year, $citation = 'simple', $names = 'full', $max_authors = 0, $group_by_type = false, $type_counts = null, $particles = 'hide' ) {
 		if ( $group_by_type ) {
 			$hits = $this->sort_hits_by_type( $hits );
 		}
@@ -834,7 +836,7 @@ class ACADPUSH_Public {
 			}
 
 			$html .= '<li class="dyzc-pub-item dyzc-cite-' . esc_attr( $citation ) . '">';
-			$html .= '<span class="dyzc-citation">' . $formatter->format( $m, $bare_doi, $title, $icon, $citation, $names, $max_authors ) . '</span>';
+			$html .= '<span class="dyzc-citation">' . $formatter->format( $m, $bare_doi, $title, $icon, $citation, $names, $max_authors, $particles ) . '</span>';
 
 			$links = array();
 			if ( ! empty( $hit->links->pdf ) ) {

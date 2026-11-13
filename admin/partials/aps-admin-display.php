@@ -524,13 +524,18 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 						</tr>
 						<tr>
 							<td><code>citation</code></td>
-							<td>Citation style of the compact view: <code>simple</code> (default), <code>abnt</code> (NBR 6023:2018), <code>apa</code> (7th), <code>ieee</code>, <code>vancouver</code>, <code>chicago</code> (author-date).</td>
+							<td>Citation style of the compact view: <code>simple</code> (default), <code>abnt</code> (NBR 6023:2025), <code>apa</code> (7th), <code>ieee</code>, <code>vancouver</code>, <code>chicago</code> (author-date).</td>
 							<td><code>'abnt'</code></td>
 						</tr>
 						<tr>
 							<td><code>names</code></td>
 							<td>Given names in full (<code>full</code>, default) or as initials (<code>initials</code>). Applies to ABNT, Chicago and simple; APA, IEEE and Vancouver always use initials.</td>
 							<td><code>'initials'</code></td>
+						</tr>
+						<tr>
+							<td><code>particles</code></td>
+							<td>ABNT with <code>names='initials'</code>: <code>hide</code> (default) leaves out da, de, dos... ("AZAMBUJA, J. R. F."); <code>keep</code> writes them ("AZAMBUJA, J. R. F. de"). Names in full always keep them.</td>
+							<td><code>'keep'</code></td>
 						</tr>
 						<tr>
 							<td><code>max_authors</code></td>
@@ -611,7 +616,7 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 					<div class="dyzc-code-block">
 						<code>[showcase-publications view='compact' citation='abnt' names='initials' citation_select='yes']</code>
 					</div>
-					<p class="description">Compact list in ABNT NBR 6023:2018 ("SILVA, J. C."), with a selector for the other styles.</p>
+					<p class="description">Compact list in ABNT NBR 6023:2025 ("SILVA, J. C."), with a selector for the other styles.</p>
 				</div>
 
 				<div class="dyzc-example">

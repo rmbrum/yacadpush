@@ -1,16 +1,23 @@
-## [2.4.0] - 2026-11-12
+## [2.4.0] - 2026-11-13
 
 ### Changed
-- ABNT enters names by the last surname (NBR 6023): "Furlanetto de Azambuja, José Rodrigo" is now
-  "AZAMBUJA, J. R. F. de" instead of "FURLANETTO DE AZAMBUJA, J. R.". The rest of the surname follows the
-  given names, and particles before the entry go to the end. Júnior, Filho, Neto and Sobrinho stay
-  with the word before them, and foreign prefixes (Dal, La, Van der...) with the entry. The other
-  styles are unchanged.
+- ABNT follows NBR 6023:2025 (it was written for the 2018 edition; the name rules did not change).
+- ABNT enters names by the last surname: "Furlanetto de Azambuja, José Rodrigo" is now
+  "AZAMBUJA, José Rodrigo Furlanetto de" instead of "FURLANETTO DE AZAMBUJA, José Rodrigo". The rest of
+  the surname follows the given names, and particles before the entry go to the end. Júnior, Filho,
+  Neto and Sobrinho stay with the word before them, and foreign prefixes (Dal, La, Van der...) with
+  the entry. The other styles are unchanged.
+- ABNT with `names="initials"` leaves particles out: "AZAMBUJA, J. R. F.", "TRENTO, P. O." (2.3.0
+  wrote "RAMOS, E. de A."). `particles="keep"` writes them.
 
 ### Added
-- Design tab, "ABNT: surnames kept whole": surnames ABNT must not split ("Gomez Caicedo"), one per
-  line, compared ignoring case and accents. Also available as the `yacadpush_abnt_compound_surnames`
-  filter.
+- Design tab, "ABNT: surnames kept whole": surnames ABNT must not split ("Gomez Caicedo", and
+  Hispanic names in general), one per line, compared ignoring case and accents. Also available as
+  the `yacadpush_abnt_compound_surnames` filter.
+- `particles="hide|keep"` shortcode option (ABNT with initials).
+
+### Fixed
+- ABNT with neither place nor publisher printed "[S. l.]: [s. n.]"; it is now "[S. l.: s. n.]".
 
 ## [2.3.0] - 2026-11-12
 

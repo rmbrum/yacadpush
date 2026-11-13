@@ -118,7 +118,7 @@ Only publications from a year (`2024`) or a range of years (`2015-2020`, `2010-`
 Citation style of the compact list. `citation` is one of:
 
 - `simple` (default): authors, title, venue, volume/issue/pages, year; five authors, then "et al.";
-- `abnt` (ABNT NBR 6023:2018): every author;
+- `abnt` (ABNT NBR 6023:2025): every author;
 - `apa` (APA 7th): up to 20 authors, then the first 19, ". . ." and the last;
 - `ieee`: up to six authors, then the first author and "et al.";
 - `vancouver` (NLM/ICMJE): up to six authors, then "et al.";
@@ -130,15 +130,17 @@ the style's author rule: three authors, then "et al.". `citation_select='yes'` s
 visitor can switch styles (query argument `pub_cite`).
 
 Name handling: names are read as stored ("Family, Given"). Names without a comma are read as
-"Given Family". ABNT enters a name by its last surname (NBR 6023): "Furlanetto de Azambuja, José
-Rodrigo" becomes "AZAMBUJA, José Rodrigo Furlanetto de" or "AZAMBUJA, J. R. F. de". The rest of the
-surname follows the given names. Portuguese and Spanish particles (da, de, dos, e, del, y...) that
-stood before the entry go to the end: "de Moura, Rafael" becomes "MOURA, Rafael de". Some words stay
-with the entry: Júnior, Filho, Neto and Sobrinho with the word before them ("ROSA JÚNIOR"), and
-foreign prefixes ("DAL BEM", "LA ROSA", "VAN DER PLAS"). Surnames that must not be split ("Gomez
-Caicedo") are listed in Settings, Design, "ABNT: surnames kept whole", one per line, or passed
-through the `yacadpush_abnt_compound_surnames` filter; case and accents are ignored. In ABNT,
-particles stay in abbreviated names ("RAMOS, E. de A."). The other styles keep the surname as
+"Given Family". ABNT enters a name by its last surname (NBR 6023:2025, 8.1.1): "Furlanetto de
+Azambuja, José Rodrigo" becomes "AZAMBUJA, José Rodrigo Furlanetto de". The rest of the surname
+follows the given names. Portuguese and Spanish particles (da, de, dos, e, del, y...) that stood
+before the entry go to the end: "de Moura, Rafael" becomes "MOURA, Rafael de". Some words stay with
+the entry: Júnior, Filho, Neto and Sobrinho with the word before them ("ROSA JÚNIOR"), and foreign
+prefixes ("DAL BEM", "LA ROSA", "VAN DER PLAS"). Surnames that must not be split are listed in
+Settings, Design, "ABNT: surnames kept whole", one per line, or passed through the
+`yacadpush_abnt_compound_surnames` filter; case and accents are ignored. The norm enters Hispanic
+names by both surnames ("GARCÍA MÁRQUEZ"), and the plugin cannot tell a Hispanic name apart, so list
+them there. With `names='initials'`, ABNT leaves the particles out ("AZAMBUJA, J. R. F.");
+`particles='keep'` writes them ("AZAMBUJA, J. R. F. de"). The other styles keep the surname as
 stored and leave particles out of the initials. Titles are printed as stored: there is no conversion
 to sentence case or title case, and journal names are not abbreviated.
 
