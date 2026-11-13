@@ -119,6 +119,7 @@ class ACADPUSH_Public {
 			'names' => '',     // full (default) | initials; ABNT, Chicago and simple only
 			'max_authors' => '', // compact view: list N authors, then "et al." (default: the style's rule)
 			'particles' => '', // ABNT with initials: hide (default) | keep da, de, dos...
+			'direct_link' => '', // compact view: icon (default) | doi, a "DOI" text label after the title
 			'citation_select' => '', // "yes" lets the visitor pick the citation style
 			'per_page' => '',  // publications per page for this shortcode (default: the API Settings value)
 			'group' => ''      // compact view: "type" adds type sub-headings inside each year
@@ -147,6 +148,7 @@ class ACADPUSH_Public {
 		$names       = strtolower( trim( $attr['names'] ) ) === 'initials' ? 'initials' : 'full';
 		$max_authors = max( 0, (int) $attr['max_authors'] );
 		$particles   = strtolower( trim( $attr['particles'] ) ) === 'keep' ? 'keep' : 'hide';
+		$direct_link = strtolower( trim( $attr['direct_link'] ) ) === 'doi' ? 'doi' : 'icon';
 
 		// The selector's choice only applies to shortcodes that show the selector,
 		// and only inside the range the shortcode allows.
@@ -254,7 +256,7 @@ class ACADPUSH_Public {
 			if ( $group_by_type ) {
 				$type_counts = $this->retrieve_type_counts( $options, $shortcode_specific_keyword, $shortcode_specific_type, $shortcode_specific_subtype, $year_from, $year_to );
 			}
-			$html .= $this->render_compact_list( $api_response->hits->hits, $lang, $group_by_year, $citation, $names, $max_authors, $group_by_type, $type_counts, $particles );
+			$html .= $this->render_compact_list( $api_response->hits->hits, $lang, $group_by_year, $citation, $names, $max_authors, $group_by_type, $type_counts, $particles, $direct_link );
 			$html .= $this->render_pagination( $page, $nb_pages, $lang );
 			// One dialog per list; the script fills it with the clicked item's card.
 			$html .= '<dialog class="dyzc-card-dialog" aria-label="' . esc_attr( $this->get_label( 'view_publication', $lang ) ) . '">'
@@ -748,7 +750,7 @@ class ACADPUSH_Public {
 	 * Compact view: one reference per publication in the chosen citation style,
 	 * optionally under year headings.
 	 */
-	private function render_compact_list( $hits, $lang, $group_by_year, $citation = 'simple', $names = 'full', $max_authors = 0, $group_by_type = false, $type_counts = null, $particles = 'hide' ) {
+	private function render_compact_list( $hits, $lang, $group_by_year, $citation = 'simple', $names = 'full', $max_authors = 0, $group_by_type = false, $type_counts = null, $particles = 'hide', $direct_link = 'icon' ) {
 		if ( $group_by_type ) {
 			$hits = $this->sort_hits_by_type( $hits );
 		}
@@ -824,15 +826,24 @@ class ACADPUSH_Public {
 			$title = esc_html( rtrim( (string) $m->title, '. ' ) );
 			$title = '<span class="dyzc-pub-title"><a href="' . esc_url( $doi_url ? $doi_url : '#' ) . '" class="dyzc-open-card"'
 				. ( $doi_url ? ' target="_blank" rel="noopener"' : '' ) . '>' . $title . '</a></span>';
-			// Icon after the title: straight to the publication (DOI), new tab.
+			// After the title: straight to the publication (DOI), new tab. An icon, or with
+			// direct_link="doi" a short text label ("DOI", or "Publication" for other links).
 			$icon = '';
 			if ( $doi_url ) {
-				$label = $this->get_label( 'view_publication', $lang );
-				$icon  = ' <a href="' . esc_url( $doi_url ) . '" class="dyzc-direct-link" target="_blank" rel="noopener"'
-					. ' title="' . esc_attr( $label ) . '" aria-label="' . esc_attr( $label ) . '">'
-					. '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
-					. '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
-					. ' d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>';
+				if ( $direct_link === 'doi' ) {
+					$is_doi = (bool) preg_match( '#^https?://(dx\.)?doi\.org/#i', $doi_url );
+					$text   = $is_doi ? 'DOI' : $this->get_label( 'view_publication', $lang );
+					$label  = $is_doi && $bare_doi !== '' ? 'DOI: ' . $bare_doi : $doi_url;
+					$icon   = ' <a href="' . esc_url( $doi_url ) . '" class="dyzc-direct-link dyzc-direct-link-text" target="_blank" rel="noopener"'
+						. ' title="' . esc_attr( $label ) . '" aria-label="' . esc_attr( $label ) . '">' . esc_html( $text ) . '</a>';
+				} else {
+					$label = $this->get_label( 'view_publication', $lang );
+					$icon  = ' <a href="' . esc_url( $doi_url ) . '" class="dyzc-direct-link" target="_blank" rel="noopener"'
+						. ' title="' . esc_attr( $label ) . '" aria-label="' . esc_attr( $label ) . '">'
+						. '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
+						. '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
+						. ' d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>';
+				}
 			}
 
 			$html .= '<li class="dyzc-pub-item dyzc-cite-' . esc_attr( $citation ) . '">';

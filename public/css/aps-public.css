@@ -325,6 +325,22 @@
 	display: block;
 }
 
+/* direct_link="doi": a small text label instead of the icon */
+.dyzc-view-compact .dyzc-direct-link-text {
+	vertical-align: baseline;
+	font-size: 0.75em;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	line-height: 1;
+	text-decoration: none;
+	color: var(--dyzc-primary, #2271b1);
+}
+
+.dyzc-view-compact .dyzc-direct-link-text:hover,
+.dyzc-view-compact .dyzc-direct-link-text:focus-visible {
+	text-decoration: underline;
+}
+
 .dyzc-view-compact .dyzc-pub-item:hover {
 	background: rgba(0, 0, 0, 0.03);
 }

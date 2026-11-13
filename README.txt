@@ -4,7 +4,7 @@ Tags: zenodo, publications, orcid, academic, research
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.4.0
+Stable tag: 2.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,12 @@ them there. With `names='initials'`, ABNT leaves the particles out ("AZAMBUJA, J
 `particles='keep'` writes them ("AZAMBUJA, J. R. F. de"). The other styles keep the surname as
 stored and leave particles out of the initials. Titles are printed as stored: there is no conversion
 to sentence case or title case, and journal names are not abbreviated.
+
+`[showcase-publications view='compact' direct_link='doi']`
+
+In the compact view, the link after each title goes straight to the publication in a new tab, while
+the title opens the full card. `direct_link='doi'` shows it as a small "DOI" label instead of the
+default arrow icon ("Publication" when the link is not a DOI). It works with every citation style.
 
 `[showcase-publications view='compact' group='type' per_page='100' year_filter='yes']`
 

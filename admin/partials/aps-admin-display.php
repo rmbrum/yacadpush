@@ -538,6 +538,11 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 							<td><code>'keep'</code></td>
 						</tr>
 						<tr>
+							<td><code>direct_link</code></td>
+							<td>Compact view: the link after the title, straight to the publication. <code>icon</code> (default) shows an arrow icon; <code>doi</code> shows a small "DOI" label (or "Publication" when the link is not a DOI).</td>
+							<td><code>'doi'</code></td>
+						</tr>
+						<tr>
 							<td><code>max_authors</code></td>
 							<td>List this many authors, then "et al.", instead of the style's own rule.</td>
 							<td><code>'3'</code></td>

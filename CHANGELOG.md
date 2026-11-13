@@ -1,3 +1,9 @@
+## [2.5.0] - 2026-11-13
+
+### Added
+- `direct_link="icon|doi"` (compact view): with `doi`, the link after the title is a small "DOI"
+  text label instead of the arrow icon ("Publication" when the link is not a DOI). Default `icon`.
+
 ## [2.4.0] - 2026-11-13
 
 ### Changed
