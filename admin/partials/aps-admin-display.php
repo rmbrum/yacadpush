@@ -500,7 +500,7 @@ $acadpush_active_tab = in_array( $acadpush_raw_tab, $acadpush_allowed_tabs, true
 						<tr>
 							<td><code>subtype</code></td>
 							<td>Filter by publication subtype (article, book, thesis, etc.). Only works when type='publication'.</td>
-							<td><code>'article'</code>, <code>'conferencepaper'</code>, <code>'thesis'</code></td>
+							<td><code>'article'</code>, <code>'conferencepaper'</code>, <code>'conferenceabstract'</code> (database mode), <code>'thesis'</code></td>
 						</tr>
 						<tr>
 							<td><code>lang</code></td>

@@ -196,7 +196,7 @@ class ACADPUSH_Public {
 		// Validate subtype (only publication subtypes for now)
 		$allowed_publication_subtypes = array(
 			'annotationcollection', 'book', 'section', 'conferencepaper',
-			'datamanagementplan', 'article', 'patent', 'preprint',
+			'conferenceabstract', 'datamanagementplan', 'article', 'patent', 'preprint',
 			'deliverable', 'milestone', 'proposal', 'report',
 			'softwaredocumentation', 'taxonomictreatment', 'technicalnote',
 			'thesis', 'workingpaper', 'other'
@@ -345,11 +345,19 @@ class ACADPUSH_Public {
 		// Action buttons
 		$html .= '<div class="dyzc-pub-actions">';
 
-		// DOI link
-		if (!empty($hit->doi) || !empty($hit->links->doi)) {
-			$doi_url = !empty($hit->links->doi) ? $hit->links->doi : 'https://doi.org/' . $hit->doi;
-			$html .= '<a href="' . esc_url($doi_url) . '" class="dyzc-btn dyzc-btn-primary" target="_blank" rel="noopener">';
+		// DOI link, or the landing page of a work without a DOI
+		$pub_url = $this->publication_url( $hit );
+		if ( $pub_url !== '' ) {
+			$html .= '<a href="' . esc_url($pub_url) . '" class="dyzc-btn dyzc-btn-primary" target="_blank" rel="noopener">';
 			$html .= esc_html( $this->get_label('view_publication', $lang) );
+			$html .= '</a>';
+		}
+
+		// Attached files (abstract, poster...), database mode
+		foreach ( $this->attachments( $hit ) as $file ) {
+			$html .= '<a href="' . esc_url( $file['url'] ) . '" class="dyzc-btn dyzc-btn-secondary dyzc-btn-file" target="_blank" rel="noopener"'
+				. ( $file['title'] !== '' ? ' title="' . esc_attr( $file['title'] ) . '"' : '' ) . '>';
+			$html .= esc_html( $file['text'] );
 			$html .= '</a>';
 		}
 
@@ -639,6 +647,49 @@ class ACADPUSH_Public {
 		return $counts;
 	}
 
+	/**
+	 * Link to the publication: its DOI, else the landing page of a work without a DOI
+	 * (database mode `url`, e.g. a Handle). '' when there is neither.
+	 */
+	private function publication_url( $hit ) {
+		if ( ! empty( $hit->links->doi ) ) {
+			return (string) $hit->links->doi;
+		}
+		if ( ! empty( $hit->doi ) ) {
+			return 'https://doi.org/' . $hit->doi;
+		}
+		if ( ! empty( $hit->links->url ) ) {
+			return (string) $hit->links->url;
+		}
+		return '';
+	}
+
+	/**
+	 * Attached files of a record (database mode), as [text, title, url]. The text is the
+	 * file's label, else its name; the title adds the name and size.
+	 */
+	private function attachments( $hit ) {
+		$out = array();
+		if ( empty( $hit->attachments ) || ! is_array( $hit->attachments ) ) {
+			return $out;
+		}
+		foreach ( $hit->attachments as $f ) {
+			$url = isset( $f->url ) ? (string) $f->url : '';
+			if ( $url === '' ) {
+				continue;
+			}
+			$name  = isset( $f->name ) ? (string) $f->name : '';
+			$label = isset( $f->label ) ? (string) $f->label : '';
+			$text  = $label !== '' ? $label : ( $name !== '' ? $name : basename( (string) wp_parse_url( $url, PHP_URL_PATH ) ) );
+			$title = $name;
+			if ( isset( $f->size ) && $f->size !== null && (int) $f->size > 0 ) {
+				$title .= ( $title !== '' ? ', ' : '' ) . size_format( (int) $f->size, 1 );
+			}
+			$out[] = array( 'text' => $text, 'title' => $title, 'url' => $url );
+		}
+		return $out;
+	}
+
 	/** Type group of a record: its Zenodo/DB subtype, mapped onto ACADPUSH_DB::TYPE_GROUP_ORDER. */
 	private function type_group_of( $m ) {
 		$subtype = ( isset( $m->resource_type->subtype ) && is_scalar( $m->resource_type->subtype ) ) ? (string) $m->resource_type->subtype : '';
@@ -807,12 +858,8 @@ class ACADPUSH_Public {
 				$current_group = $group;
 			}
 
-			$doi_url = '';
-			if ( ! empty( $hit->links->doi ) ) {
-				$doi_url = $hit->links->doi;
-			} elseif ( ! empty( $hit->doi ) ) {
-				$doi_url = 'https://doi.org/' . $hit->doi;
-			}
+			// The DOI, else the landing page of a work without one.
+			$doi_url = $this->publication_url( $hit );
 
 			$bare_doi = '';
 			if ( ! empty( $hit->doi ) ) {
@@ -847,11 +894,16 @@ class ACADPUSH_Public {
 			}
 
 			$html .= '<li class="dyzc-pub-item dyzc-cite-' . esc_attr( $citation ) . '">';
-			$html .= '<span class="dyzc-citation">' . $formatter->format( $m, $bare_doi, $title, $icon, $citation, $names, $max_authors, $particles ) . '</span>';
+			$web_url = $bare_doi === '' ? $doi_url : '';
+			$html .= '<span class="dyzc-citation">' . $formatter->format( $m, $bare_doi, $title, $icon, $citation, $names, $max_authors, $particles, $web_url ) . '</span>';
 
 			$links = array();
 			if ( ! empty( $hit->links->pdf ) ) {
 				$links[] = '<a href="' . esc_url( $hit->links->pdf ) . '" target="_blank" rel="noopener">' . esc_html( $this->get_label( 'view_pdf', $lang ) ) . '</a>';
+			}
+			foreach ( $this->attachments( $hit ) as $file ) {
+				$links[] = '<a href="' . esc_url( $file['url'] ) . '" target="_blank" rel="noopener"'
+					. ( $file['title'] !== '' ? ' title="' . esc_attr( $file['title'] ) . '"' : '' ) . '>' . esc_html( $file['text'] ) . '</a>';
 			}
 			$repo = ! empty( $hit->links->self_html ) ? $hit->links->self_html : ( ! empty( $hit->links->latest_html ) ? $hit->links->latest_html : '' );
 			if ( $repo ) {
@@ -985,6 +1037,7 @@ class ACADPUSH_Public {
 				'citation_simple'  => 'Jednoduchý',
 				'group_article'         => 'Články v časopisech',
 				'group_conferencepaper' => 'Příspěvky na konferencích',
+				'group_conferenceabstract' => 'Abstrakty z konferencí',
 				'group_section'         => 'Kapitoly v knihách',
 				'group_book'            => 'Knihy',
 				'group_preprint'        => 'Preprinty',
@@ -1012,6 +1065,7 @@ class ACADPUSH_Public {
 				'citation_simple'  => 'Simple',
 				'group_article'         => 'Journal articles',
 				'group_conferencepaper' => 'Conference papers',
+				'group_conferenceabstract' => 'Conference abstracts',
 				'group_section'         => 'Book chapters',
 				'group_book'            => 'Books',
 				'group_preprint'        => 'Preprints',
@@ -1039,6 +1093,7 @@ class ACADPUSH_Public {
 				'citation_simple'  => 'Simples',
 				'group_article'         => 'Artigos em periódicos',
 				'group_conferencepaper' => 'Trabalhos completos em anais de eventos',
+				'group_conferenceabstract' => 'Resumos em anais de eventos',
 				'group_section'         => 'Capítulos de livros',
 				'group_book'            => 'Livros',
 				'group_preprint'        => 'Preprints',

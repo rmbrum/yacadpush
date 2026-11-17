@@ -8,13 +8,15 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- -----------------------------------------------------------------------------
--- publications — registro principal, um por DOI
+-- publications — registro principal, um por DOI (ou por URL, sem DOI)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS publications (
     id                  INT UNSIGNED    NOT NULL AUTO_INCREMENT,
 
-    -- identificadores
-    doi                 VARCHAR(255)    NOT NULL,
+    -- identificadores: a DOI or a landing-page URL (e.g. a Handle), or both.
+    -- The key is the DOI when there is one, else the URL.
+    doi                 VARCHAR(255)    DEFAULT NULL,
+    url                 VARCHAR(512)    DEFAULT NULL,
     zenodo_deposit_id   INT UNSIGNED    DEFAULT NULL,
     zenodo_doi          VARCHAR(255)    DEFAULT NULL,
     zenodo_deposit_url  VARCHAR(1024)   DEFAULT NULL,
@@ -23,7 +25,7 @@ CREATE TABLE IF NOT EXISTS publications (
     title               TEXT            NOT NULL,
     description         MEDIUMTEXT      DEFAULT NULL,
     upload_type         VARCHAR(64)     NOT NULL DEFAULT 'publication',
-                        -- article | conferencepaper | book | report | publication
+                        -- article | conferencepaper | conferenceabstract | book | report | publication
     publication_date    VARCHAR(32)     DEFAULT NULL,   -- YYYY ou YYYY-MM-DD
     publisher           VARCHAR(512)    DEFAULT NULL,
 
@@ -63,6 +65,7 @@ CREATE TABLE IF NOT EXISTS publications (
 
     PRIMARY KEY (id),
     UNIQUE KEY uq_doi (doi),
+    UNIQUE KEY uq_url (url),
     KEY idx_upload_type     (upload_type),
     KEY idx_publication_date(publication_date),
     KEY idx_status          (status),
@@ -139,6 +142,27 @@ CREATE TABLE IF NOT EXISTS communities (
     KEY idx_publication (publication_id),
     KEY idx_community   (community_id),
     CONSTRAINT fk_communities_publication
+        FOREIGN KEY (publication_id) REFERENCES publications(id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- -----------------------------------------------------------------------------
+-- files — files attached to a publication (abstract, poster, video...), shown as
+-- links next to it (N para 1 com publications). Since 2.6.0.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS files (
+    id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    publication_id  INT UNSIGNED    NOT NULL,
+    position        SMALLINT        NOT NULL DEFAULT 0,
+    label           VARCHAR(255)    DEFAULT NULL,   -- link text ("Abstract", "Poster")
+    name            VARCHAR(512)    DEFAULT NULL,   -- file name
+    url             VARCHAR(1024)   NOT NULL,
+    size_bytes      BIGINT UNSIGNED DEFAULT NULL,
+
+    PRIMARY KEY (id),
+    KEY idx_publication (publication_id),
+    CONSTRAINT fk_files_publication
         FOREIGN KEY (publication_id) REFERENCES publications(id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -20,13 +20,29 @@ class ACADPUSH_DB {
     /** @var string|null Mensagem do último erro de conexão */
     public $connect_error = null;
 
+    /** @var bool|null Whether the 2.6.0 schema is present (publications.url, files). */
+    private $has_v26 = null;
+
+    /**
+     * Whether the database has the 2.6.0 additions (publications.url and the files
+     * table, see migrations/2.6.0.sql). Without them the plugin keeps working as before.
+     */
+    private function has_v26_schema(): bool {
+        if ( $this->has_v26 === null ) {
+            $url   = $this->conn->query( "SHOW COLUMNS FROM publications LIKE 'url'" );
+            $files = $this->conn->query( "SHOW TABLES LIKE 'files'" );
+            $this->has_v26 = $url && $url->num_rows > 0 && $files && $files->num_rows > 0;
+        }
+        return $this->has_v26;
+    }
+
     /**
      * `upload_type` values that belong to the Zenodo `publication` family
      * (the generic `publication` plus every publication subtype).
      */
     const PUBLICATION_UPLOAD_TYPES = [
         'publication', 'annotationcollection', 'book', 'section', 'conferencepaper',
-        'datamanagementplan', 'article', 'patent', 'preprint', 'deliverable',
+        'conferenceabstract', 'datamanagementplan', 'article', 'patent', 'preprint', 'deliverable',
         'milestone', 'proposal', 'report', 'softwaredocumentation',
         'taxonomictreatment', 'technicalnote', 'thesis', 'workingpaper', 'other',
     ];
@@ -211,7 +227,7 @@ class ACADPUSH_DB {
      * Order of the type groups in the compact view (group="type"); every other
      * upload type falls into "other", after these.
      */
-    const TYPE_GROUP_ORDER = [ 'article', 'conferencepaper', 'section', 'book', 'preprint', 'report', 'thesis' ];
+    const TYPE_GROUP_ORDER = [ 'article', 'conferencepaper', 'conferenceabstract', 'section', 'book', 'preprint', 'report', 'thesis' ];
 
     /** Group key of an upload type. */
     public static function type_group( string $upload_type ): string {
@@ -399,10 +415,12 @@ class ACADPUSH_DB {
         $count_stmt->close();
 
         // --- Registros da página ---
+        $url_col  = $this->has_v26_schema() ? 'p.url' : 'NULL AS url';
         $data_sql = "
             SELECT
                 p.id,
                 p.doi,
+                {$url_col},
                 p.title,
                 p.description,
                 p.upload_type,
@@ -443,6 +461,8 @@ class ACADPUSH_DB {
             $keywords    = $this->fetch_keywords( $pub_id );
             // Related identifiers (para DOI e PDF links)
             $related     = $this->fetch_related_identifiers( $pub_id );
+            // Attached files (abstract, poster...), when the schema has them
+            $files       = $this->has_v26_schema() ? $this->fetch_files( $pub_id ) : [];
 
             // Monta objeto metadata compatível com o que o plugin espera do Zenodo
             $metadata = (object) [
@@ -492,14 +512,18 @@ class ACADPUSH_DB {
 
             $links = (object) [
                 'doi'       => $doi_url,
+                // Landing page of a work without a DOI (e.g. a Handle); plugin extension.
+                'url'       => $row['url'] ?? '',
                 'pdf'       => $pdf_url,
                 'self_html' => $row['zenodo_deposit_url'] ?? '',
             ];
 
             $hit = (object) [
-                'doi'      => $row['doi'],
-                'metadata' => $metadata,
-                'links'    => $links,
+                'doi'         => $row['doi'] ?? '',
+                'metadata'    => $metadata,
+                'links'       => $links,
+                // Plugin extension: [{label, name, url, size}], shown as links.
+                'attachments' => $files,
             ];
 
             $hits[] = $hit;
@@ -554,6 +578,26 @@ class ACADPUSH_DB {
         return $keywords;
     }
 
+    private function fetch_files( int $pub_id ): array {
+        $sql  = 'SELECT label, name, url, size_bytes FROM files WHERE publication_id = ? ORDER BY position ASC, id ASC';
+        $stmt = $this->conn->prepare( $sql );
+        $stmt->bind_param( 'i', $pub_id );
+        $stmt->execute();
+        $res  = $stmt->get_result();
+
+        $files = [];
+        while ( $row = $res->fetch_assoc() ) {
+            $files[] = (object) [
+                'label' => (string) ( $row['label'] ?? '' ),
+                'name'  => (string) ( $row['name'] ?? '' ),
+                'url'   => (string) $row['url'],
+                'size'  => $row['size_bytes'] !== null ? (int) $row['size_bytes'] : null,
+            ];
+        }
+        $stmt->close();
+        return $files;
+    }
+
     private function fetch_related_identifiers( int $pub_id ): array {
         $sql  = 'SELECT identifier, relation, resource_type FROM related_identifiers WHERE publication_id = ?';
         $stmt = $this->conn->prepare( $sql );
@@ -573,6 +617,7 @@ class ACADPUSH_DB {
         $map = [
             'article'          => 'Journal Article',
             'conferencepaper'  => 'Conference Paper',
+            'conferenceabstract' => 'Conference Abstract',
             'book'             => 'Book',
             'section'          => 'Book Section',
             'preprint'         => 'Preprint',
@@ -586,6 +631,7 @@ class ACADPUSH_DB {
             $map = [
                 'article'          => 'Artigo em periódico',
                 'conferencepaper'  => 'Artigo em evento',
+                'conferenceabstract' => 'Resumo em evento',
                 'book'             => 'Livro',
                 'section'          => 'Capítulo de livro',
                 'preprint'         => 'Preprint',

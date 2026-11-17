@@ -1,8 +1,8 @@
 {
-  "_comment": "SYNTHETIC test fixture. DOIs, authors and titles are invented. Do not upload to Zenodo.",
-  "format_version": "1.0",
+  "_comment": "SYNTHETIC test fixture. DOIs, URLs, authors and titles are invented. Do not upload to Zenodo.",
+  "format_version": "1.1",
   "generated_at": "2026-01-01T00:00:00Z",
-  "total": 2,
+  "total": 3,
   "entries": [
     {
       "doi": "10.0000/yacadpush.sample.0001",
@@ -64,6 +64,37 @@
         ],
         "license": "cc-by-4.0"
       },
+      "status": "pending",
+      "zenodo_deposit_id": null,
+      "zenodo_deposit_url": null,
+      "zenodo_doi": null,
+      "error": null
+    },
+    {
+      "doi": null,
+      "url": "https://example.org/handle/0000/3",
+      "collected_at": "2026-01-01T00:00:00Z",
+      "ieee_raw": {},
+      "crossref_raw": {},
+      "zenodo_metadata": {
+        "upload_type": "conferenceabstract",
+        "title": "A Synthetic Conference Abstract Without a DOI",
+        "description": "Third synthetic entry: no DOI (keyed by its URL), a conference abstract with attached files.",
+        "creators": [
+          {"name": "Souza, Ana Maria de", "affiliation": "Example University"}
+        ],
+        "publication_date": "2025",
+        "access_right": "open",
+        "keywords": ["testing"],
+        "conference_title": "Synthetic Student Research Fair, 3.",
+        "conference_place": "Porto Alegre",
+        "related_identifiers": [],
+        "license": "cc-by-4.0"
+      },
+      "files": [
+        {"label": "Abstract", "name": "Abstract_3.pdf", "url": "https://example.org/files/0000/3/Abstract_3.pdf", "size": 143459},
+        {"label": "Poster", "name": "Poster_3.pdf", "url": "https://example.org/files/0000/3/Poster_3.pdf", "size": 1048576}
+      ],
       "status": "pending",
       "zenodo_deposit_id": null,
       "zenodo_deposit_url": null,

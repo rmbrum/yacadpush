@@ -1,3 +1,21 @@
+## [2.6.0] - 2026-11-16
+
+### Added
+- Database mode accepts works without a DOI: a JSON entry may have `url` (a landing page, such as a
+  Handle) instead of `doi`. `json_to_db.py` uses the DOI as the key, else the URL, also for `--update`
+  and `--prune`; a work first loaded by its URL keeps its row when it gains a DOI. The title and the
+  "Publication" button open the URL, and the citation styles print it where they print the DOI.
+- Upload type `conferenceabstract` (not a Zenodo type), with its own `group='type'` sub-heading,
+  "Conference abstracts" / "Resumos em anais de eventos". Citation styles treat it as a conference work.
+- Attached files: a JSON entry may list `files` (label, name, url, size). They show as buttons on the
+  card and as links after the compact line, next to "PDF".
+- `migrations/2.6.0.sql` for databases created before 2.6.0 (`publications.doi` becomes optional,
+  `publications.url` and the `files` table are added). Without it the plugin works as before, and
+  `json_to_db.py` stops with a message.
+
+### Changed
+- Intermediate JSON format version 1.1 (`url` and `files` in an entry). 1.0 files load unchanged.
+
 ## [2.5.0] - 2026-11-13
 
 ### Added

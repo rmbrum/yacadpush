@@ -76,7 +76,10 @@ ZENODO_BASE_URL = (
 REQUEST_DELAY = 1.0  # segundos entre requisições
 
 # Versão do formato JSON intermediário — permite detectar arquivos desatualizados
-INTERMEDIATE_FORMAT_VERSION = "1.0"
+INTERMEDIATE_FORMAT_VERSION = "1.1"
+# 1.1 (2.6.0): an entry may have `url` instead of `doi` (works without a DOI, keyed by
+# their landing page) and a `files` list; both are read by json_to_db.py. 1.0 files
+# load unchanged.
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +492,7 @@ def import_from_json(input_file: str, args: argparse.Namespace) -> None:
         if entry.get("status") != "pending":
             continue
 
-        doi = entry["doi"]
+        doi = entry.get("doi") or entry.get("url") or "?"
         print(f"\n[{i+1}/{len(entries)}] DOI: {doi}")
         try:
             result = upload_to_zenodo(entry["zenodo_metadata"], publish=publish)

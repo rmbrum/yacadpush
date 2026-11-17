@@ -4,7 +4,7 @@ Tags: zenodo, publications, orcid, academic, research
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.5.0
+Stable tag: 2.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -155,10 +155,34 @@ default arrow icon ("Publication" when the link is not a DOI). It works with eve
 `per_page` sets the number of publications per page for this shortcode. Without it, the shortcode uses the
 API Settings value. The maximum is 1000 in database mode and 100 in Zenodo modes, which is the API limit.
 `group='type'` adds sub-headings inside each year of the compact list, in this order: Journal articles,
-Conference papers, Book chapters, Books, Preprints, Reports, Theses, then Other publications. The
+Conference papers, Conference abstracts, Book chapters, Books, Preprints, Reports, Theses, then Other
+publications. The
 sub-headings are in the page language. In database mode each one shows its count for the whole year,
 and the list is ordered so that a page break never mixes the groups. In Zenodo modes the grouping only
 reorders the current page, without counts.
+
+**Works without a DOI, conference abstracts and attached files (database mode)**
+
+In the JSON read by `tools/json_to_db.py`, an entry is identified by its `doi` or, for a work without a
+DOI, by its `url`: the landing page, such as a Handle (`https://hdl.handle.net/10183/135971`). When both
+are given, the DOI is the key and the link. Without a DOI, the title and the "Publication" button open
+the URL, and the citation styles print it where they would print the DOI ("Disponível em:" in ABNT,
+"Available from:" in Vancouver).
+
+The upload type `conferenceabstract` (not a Zenodo type) is for abstracts published in conference
+proceedings or presented at student research fairs. Put the event name in `conference_title` and the
+city in `conference_place`. With `group='type'`, these works get their own sub-heading, Conference
+abstracts. `subtype='conferenceabstract'` filters them.
+
+An entry may also list files, shown as buttons on the card and as links after the compact line:
+
+    "files": [
+      {"label": "Abstract", "name": "Abstract_1.pdf", "url": "https://.../Abstract_1.pdf", "size": 143459},
+      {"label": "Poster", "url": "https://.../Poster_1.pdf"}
+    ]
+
+The link text is `label`, else `name`. A database created before 2.6.0 needs `migrations/2.6.0.sql` once.
+Until then, the plugin shows the database as before, and `json_to_db.py` stops with a message.
 
 **Database credentials outside wp_options**
 
@@ -206,6 +230,7 @@ only reads the database, so give it a MySQL user with `SELECT` privilege only.
 - `book` - Book
 - `section` - Book section
 - `conferencepaper` - Conference paper
+- `conferenceabstract` - Conference abstract (database mode only; not a Zenodo type)
 - `thesis` - Thesis
 - `report` - Report
 - `preprint` - Preprint

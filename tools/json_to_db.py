@@ -4,6 +4,13 @@ json_to_db.py
 =============
 Carrega (ou atualiza) publicações do JSON intermediário no banco MySQL.
 
+Each entry is identified by its `doi` or, for works without a DOI, by its `url`
+(a landing page such as a Handle, "https://hdl.handle.net/10183/135971"). When
+both are given the DOI is the key. An entry may also list `files` (abstract,
+poster, video...): [{"label": "Poster", "name": "Poster_1.pdf",
+"url": "https://...", "size": 123456}], shown as links next to the publication.
+Databases created before 2.6.0 need migrations/2.6.0.sql first.
+
 Dependências:
     pip install mysql-connector-python python-dotenv
 
@@ -15,7 +22,7 @@ Configuração (.env):
     DB_PASSWORD - senha
 
 Uso:
-    # Inserir entradas novas (ignora as já existentes pelo DOI)
+    # Inserir entradas novas (ignora as já existentes pelo DOI ou URL)
     python json_to_db.py publicacoes.json
 
     # Inserir E atualizar entradas já existentes
@@ -28,7 +35,7 @@ Uso:
     # Pré-visualizar sem alterar o banco
     python json_to_db.py --dry-run publicacoes.json
 
-    # Sincronizar: também apagar do banco as publicações cujo DOI não está no JSON
+    # Sincronizar: também apagar do banco as publicações cujo DOI/URL não está no JSON
     python json_to_db.py --update --prune publicacoes.json
     python json_to_db.py --prune --dry-run publicacoes.json   # só lista o que seria apagado
     # Por segurança, --prune recusa apagar mais de 10% das publicações do banco
@@ -84,6 +91,40 @@ def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _ids(entry: dict[str, Any]) -> tuple[str | None, str | None]:
+    """(doi, url) of an entry, None when absent. The DOI is the key when present."""
+    doi = (entry.get("doi") or "").strip() or None
+    url = (entry.get("url") or "").strip() or None
+    return doi, url
+
+
+def _label(entry: dict[str, Any]) -> str:
+    doi, url = _ids(entry)
+    return doi or url or "?"
+
+
+def _keys(doi: str | None, url: str | None) -> set[str]:
+    """Identity keys used by --prune: a row and an entry match when they share one."""
+    keys = set()
+    if doi:
+        keys.add("doi:" + doi.lower())
+    if url:
+        keys.add("url:" + url)
+    return keys
+
+
+def check_schema(cursor) -> str | None:
+    """Error message when the database lacks the 2.6.0 schema (url column, files table)."""
+    cursor.execute("SHOW COLUMNS FROM publications LIKE 'url'")
+    has_url = cursor.fetchall()
+    cursor.execute("SHOW TABLES LIKE 'files'")
+    has_files = cursor.fetchall()
+    if has_url and has_files:
+        return None
+    return ("ERRO: o banco foi criado antes da versão 2.6.0 (falta a coluna publications.url "
+            "ou a tabela files). Rode migrations/2.6.0.sql uma vez e tente de novo.")
+
+
 # ---------------------------------------------------------------------------
 # Operações por tabela
 # ---------------------------------------------------------------------------
@@ -116,15 +157,24 @@ def _upsert_publication(
     """
     Insere ou atualiza a tabela publications.
     Returns (id, action) with action "insert", "update" or "skip" (id None:
-    the DOI already exists and --update was not given).
+    the publication already exists and --update was not given).
     """
     meta = entry.get("zenodo_metadata", {})
-    doi = entry.get("doi", "")
+    doi, url = _ids(entry)
+    if not doi and not url:
+        raise ValueError("entrada sem doi e sem url")
 
-    # Verifica se já existe
-    cursor.execute("SELECT id FROM publications WHERE doi = %s", (doi,))
-    row = cursor.fetchone()
-    existing_id = row[0] if row else None
+    # Verifica se já existe: pelo DOI, depois pela URL (a work found by its URL may
+    # have gained a DOI since the last load).
+    existing_id = None
+    if doi:
+        cursor.execute("SELECT id FROM publications WHERE doi = %s", (doi,))
+        row = cursor.fetchone()
+        existing_id = row[0] if row else None
+    if existing_id is None and url:
+        cursor.execute("SELECT id FROM publications WHERE url = %s", (url,))
+        row = cursor.fetchone()
+        existing_id = row[0] if row else None
 
     if existing_id and not update:
         return None, "skip"
@@ -147,6 +197,7 @@ def _upsert_publication(
 
     fields = {
         "doi":                doi,
+        "url":                url,
         "zenodo_deposit_id":  entry.get("zenodo_deposit_id"),
         "zenodo_doi":         entry.get("zenodo_doi"),
         "zenodo_deposit_url": entry.get("zenodo_deposit_url"),
@@ -176,9 +227,9 @@ def _upsert_publication(
     }
 
     if existing_id:
-        # UPDATE — não toca em campos de controle de importação desnecessariamente
-        set_clause = ", ".join(f"`{k}` = %s" for k in fields if k != "doi")
-        values = [v for k, v in fields.items() if k != "doi"] + [existing_id]
+        # UPDATE — the identifiers are rewritten too, so a DOI found later is stored
+        set_clause = ", ".join(f"`{k}` = %s" for k in fields)
+        values = list(fields.values()) + [existing_id]
         cursor.execute(
             f"UPDATE publications SET {set_clause} WHERE id = %s",
             values,
@@ -238,6 +289,28 @@ def _replace_related_identifiers(cursor, pub_id: int, meta: dict[str, Any]) -> N
         )
 
 
+def _replace_files(cursor, pub_id: int, entry: dict[str, Any]) -> None:
+    cursor.execute("DELETE FROM files WHERE publication_id = %s", (pub_id,))
+    for pos, f in enumerate(entry.get("files") or []):
+        url = (f.get("url") or "").strip()
+        if not url:
+            continue
+        size = f.get("size")
+        cursor.execute(
+            """INSERT INTO files
+               (publication_id, position, label, name, url, size_bytes)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (
+                pub_id,
+                pos,
+                (f.get("label") or "")[:255] or None,
+                (f.get("name") or "")[:512] or None,
+                url[:1024],
+                int(size) if isinstance(size, (int, float)) and size >= 0 else None,
+            ),
+        )
+
+
 def _replace_communities(cursor, pub_id: int, meta: dict[str, Any]) -> None:
     cursor.execute("DELETE FROM communities WHERE publication_id = %s", (pub_id,))
     for comm in meta.get("communities", []):
@@ -253,35 +326,39 @@ def _replace_communities(cursor, pub_id: int, meta: dict[str, Any]) -> None:
 # Fluxo principal
 # ---------------------------------------------------------------------------
 
-CHILD_TABLES = ("authors", "keywords", "related_identifiers", "communities")
+CHILD_TABLES = ("authors", "keywords", "related_identifiers", "communities", "files")
 
 
-def _prune_candidates(cursor, keep_dois: set[str]) -> tuple[list[tuple[int, str, str]], int]:
-    """Publications whose DOI (case-insensitive) is not in keep_dois, and the table size."""
-    cursor.execute("SELECT id, doi, title FROM publications")
+def _prune_candidates(cursor, keep: set[str]) -> tuple[list[tuple[int, str, str]], int]:
+    """Publications sharing no key (DOI, case-insensitive, or URL) with the JSON, and the table size."""
+    cursor.execute("SELECT id, doi, url, title FROM publications")
     rows = cursor.fetchall()
-    gone = [(pid, doi, title or "") for pid, doi, title in rows if (doi or "").strip().lower() not in keep_dois]
+    gone = [
+        (pid, doi or url or "?", title or "")
+        for pid, doi, url, title in rows
+        if not (_keys((doi or "").strip() or None, (url or "").strip() or None) & keep)
+    ]
     return gone, len(rows)
 
 
 def prune(
     cursor,
     conn,
-    keep_dois: set[str],
+    keep: set[str],
     max_pct: float,
     force: bool,
     dry_run: bool,
 ) -> bool:
-    """Delete publications (and their child rows) whose DOI is not in the JSON.
+    """Delete publications (and their child rows) whose DOI or URL is not in the JSON.
 
     Returns False when the safety stop prevented the deletion.
     """
-    gone, total = _prune_candidates(cursor, keep_dois)
+    gone, total = _prune_candidates(cursor, keep)
     pct = (100.0 * len(gone) / total) if total else 0.0
     print()
     print(f"Prune   : {len(gone)} de {total} publicações no banco não estão no JSON ({pct:.1f}%)")
-    for _pid, doi, title in gone:
-        print(f"  [{'dry-run' if dry_run else 'delete'}] {doi} | {title[:60]}")
+    for _pid, ident, title in gone:
+        print(f"  [{'dry-run' if dry_run else 'delete'}] {ident} | {title[:60]}")
 
     if not gone:
         return True
@@ -338,32 +415,46 @@ def load_json(
         print(f"Filtro  : status = {status_filter}")
     print()
 
-    keep_dois = {(e.get("doi") or "").strip().lower() for e in all_entries if (e.get("doi") or "").strip()}
-    if do_prune and not keep_dois:
-        print("ERRO: --prune com um JSON sem nenhum DOI apagaria o banco inteiro. Nada foi feito.")
+    keep: set[str] = set()
+    for e in all_entries:
+        keep |= _keys(*_ids(e))
+    if do_prune and not keep:
+        print("ERRO: --prune com um JSON sem nenhum DOI ou URL apagaria o banco inteiro. Nada foi feito.")
         return 1
 
     if dry_run:
+        bad = 0
         for entry in entries:
-            doi = entry.get("doi", "?")
             title = entry.get("zenodo_metadata", {}).get("title", "?")
-            print(f"  [dry-run] {doi} | {title[:70]}")
+            if not any(_ids(entry)):
+                print(f"  [error]  ? | entrada sem doi e sem url | {title[:50]}")
+                bad += 1
+                continue
+            files = len(entry.get("files") or [])
+            extra = f" | {files} arquivo(s)" if files else ""
+            print(f"  [dry-run] {_label(entry)} | {title[:70]}{extra}")
         if do_prune:
             conn = get_connection()
             cursor = conn.cursor()
-            ok = prune(cursor, conn, keep_dois, prune_max, force, dry_run=True)
+            ok = prune(cursor, conn, keep, prune_max, force, dry_run=True)
             cursor.close()
             conn.close()
-            return 0 if ok else 2
-        return 0
+            return 1 if bad else (0 if ok else 2)
+        return 1 if bad else 0
 
     conn = get_connection()
     cursor = conn.cursor()
+    schema_error = check_schema(cursor)
+    if schema_error:
+        print(schema_error)
+        cursor.close()
+        conn.close()
+        return 1
 
     inserted = updated = skipped = errors = 0
 
     for entry in entries:
-        doi = entry.get("doi", "")
+        doi = _label(entry)
         title = entry.get("zenodo_metadata", {}).get("title", "")[:60]
         try:
             pub_id, action = _upsert_publication(cursor, entry, update)
@@ -378,6 +469,7 @@ def load_json(
             _replace_keywords(cursor, pub_id, meta)
             _replace_related_identifiers(cursor, pub_id, meta)
             _replace_communities(cursor, pub_id, meta)
+            _replace_files(cursor, pub_id, entry)
 
             conn.commit()
 
@@ -395,7 +487,7 @@ def load_json(
 
     pruned_ok = True
     if do_prune:
-        pruned_ok = prune(cursor, conn, keep_dois, prune_max, force, dry_run=False)
+        pruned_ok = prune(cursor, conn, keep, prune_max, force, dry_run=False)
 
     cursor.close()
     conn.close()
@@ -420,7 +512,7 @@ def main() -> None:
     p.add_argument("json_file", help="Caminho para o arquivo JSON intermediário")
     p.add_argument(
         "--update", action="store_true",
-        help="Atualizar entradas já existentes (padrão: ignorar duplicatas por DOI)",
+        help="Atualizar entradas já existentes (padrão: ignorar duplicatas por DOI ou URL)",
     )
     p.add_argument(
         "--status", metavar="STATUS",
@@ -433,7 +525,7 @@ def main() -> None:
     p.add_argument(
         "--prune", action="store_true",
         help="Apagar do banco as publicações (e seus autores, palavras-chave, identificadores "
-             "e comunidades) cujo DOI não está no JSON",
+             "comunidades e arquivos) cujo DOI ou URL não está no JSON",
     )
     p.add_argument(
         "--prune-max", metavar="PCT", type=float, default=10.0,

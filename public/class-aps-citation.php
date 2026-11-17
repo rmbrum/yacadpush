@@ -103,9 +103,12 @@ class ACADPUSH_Citation {
 	 * @param int    $max_authors 0 = the style's own rule; N = first N, then "et al.".
 	 * @param string $particles   ABNT with initials: "hide" (default) leaves out da, de, dos...
 	 *                            ("AZAMBUJA, J. R. F."); "keep" writes them ("AZAMBUJA, J. R. F. de").
+	 * @param string $url         Web address of a work without a DOI (e.g. a Handle), or ''.
+	 *                            Printed where the style prints the DOI; ignored when there is a DOI.
 	 */
-	public function format( $m, $doi, $title_html, $after_title, $style, $names = 'full', $max_authors = 0, $particles = 'hide' ) {
+	public function format( $m, $doi, $title_html, $after_title, $style, $names = 'full', $max_authors = 0, $particles = 'hide', $url = '' ) {
 		$r = $this->normalize( $m, $doi );
+		$r['url'] = $r['doi'] === '' ? trim( (string) $url ) : '';
 		$r['title_html']  = $title_html;
 		$r['after_title'] = $after_title;
 		$r['initials']    = ( $names === 'initials' );
@@ -156,12 +159,13 @@ class ACADPUSH_Citation {
 		$conference = $get( $meeting, 'title' );
 
 		// What kind of reference: from the subtype when known, else from the fields present.
-		if ( in_array( $subtype, array( 'section', 'book', 'conferencepaper', 'article' ), true ) ) {
+		if ( in_array( $subtype, array( 'section', 'book', 'conferencepaper', 'conferenceabstract', 'article' ), true ) ) {
 			$kind = array(
-				'section'         => 'chapter',
-				'book'            => 'book',
-				'conferencepaper' => 'conference',
-				'article'         => 'article',
+				'section'            => 'chapter',
+				'book'               => 'book',
+				'conferencepaper'    => 'conference',
+				'conferenceabstract' => 'conference',
+				'article'            => 'article',
 			)[ $subtype ];
 		} elseif ( $conference !== '' ) {
 			$kind = 'conference';
@@ -515,6 +519,11 @@ class ACADPUSH_Citation {
 		return '<a class="dyzc-doi" href="' . esc_url( 'https://doi.org/' . $doi ) . '" target="_blank" rel="noopener">' . esc_html( $text ) . '</a>';
 	}
 
+	/** Link to the web address of a work without a DOI, showing the address itself. */
+	private function url_link( $url ) {
+		return '<a class="dyzc-url" href="' . esc_url( $url ) . '" target="_blank" rel="noopener">' . esc_html( $url ) . '</a>';
+	}
+
 	/** Joins non-empty pieces. */
 	private function join( array $pieces, $sep ) {
 		return implode( $sep, array_filter( $pieces, function ( $p ) {
@@ -594,6 +603,8 @@ class ACADPUSH_Citation {
 
 		if ( $r['doi'] !== '' ) {
 			$out[] = 'DOI: ' . $this->doi_link( $r['doi'], $r['doi'] ) . '.';
+		} elseif ( $r['url'] !== '' ) {
+			$out[] = 'Disponível em: ' . $this->url_link( $r['url'] ) . '.';
 		}
 		return implode( ' ', $out );
 	}
@@ -664,6 +675,8 @@ class ACADPUSH_Citation {
 		}
 		if ( $r['doi'] !== '' ) {
 			$out[] = $this->doi_link( $r['doi'], 'https://doi.org/' . $r['doi'] );
+		} elseif ( $r['url'] !== '' ) {
+			$out[] = $this->url_link( $r['url'] );
 		}
 		return $this->join( $out, ' ' );
 	}
@@ -740,6 +753,9 @@ class ACADPUSH_Citation {
 			$parts[] = 'doi: ' . $this->doi_link( $r['doi'], $r['doi'] );
 		}
 		$body = $this->join( array_map( 'trim', $parts ), ', ' ) . '.';
+		if ( $r['doi'] === '' && $r['url'] !== '' ) {
+			$body .= ' [Online]. Available: ' . $this->url_link( $r['url'] );
+		}
 		return $authors !== '' ? $authors . ', ' . $body : $body;
 	}
 
@@ -794,6 +810,8 @@ class ACADPUSH_Citation {
 
 		if ( $r['doi'] !== '' ) {
 			$out[] = 'doi:' . $this->doi_link( $r['doi'], $r['doi'] );
+		} elseif ( $r['url'] !== '' ) {
+			$out[] = 'Available from: ' . $this->url_link( $r['url'] );
 		}
 		return $this->join( $out, ' ' );
 	}
@@ -859,6 +877,8 @@ class ACADPUSH_Citation {
 
 		if ( $r['doi'] !== '' ) {
 			$out[] = $this->doi_link( $r['doi'], 'https://doi.org/' . $r['doi'] ) . '.';
+		} elseif ( $r['url'] !== '' ) {
+			$out[] = $this->url_link( $r['url'] ) . '.';
 		}
 		return $this->join( $out, ' ' );
 	}
